@@ -1,18 +1,17 @@
 import math
 import random
-from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Optional, Dict
 
 import numpy as np
 
-from simulation import Action, Event, EventCollector
+from simulation import Action, Event, EventCollector, Tick
 
 
 class AuctionEvents:
     WIN = "win"
-    NO_BID = "no-bid"
+    NO_WIN = "no-win"
 
 
 @dataclass
@@ -26,9 +25,9 @@ class Pacing:
 
     def should_bid(self, value) -> bool: pass
 
-    def charge(self, value): pass
+    def charge(self, ec: EventCollector, tick: Tick, bid: Bid): pass
 
-    def adjust(self): pass
+    def adjust(self, ec: EventCollector, tick: Tick): pass
 
 
 class AsapPacing(Pacing):
@@ -39,10 +38,8 @@ class AsapPacing(Pacing):
     def should_bid(self, value) -> bool:
         return (self.budget_daily - self.budget_spent) >= value
 
-    def charge(self, value):
-        self.budget_spent += value
-
-    def adjust(self): pass
+    def charge(self, ec: EventCollector, tick: Tick, bid: Bid):
+        self.budget_spent += bid.value
 
 
 class CumulativeEqualPacing(Pacing):
@@ -55,11 +52,11 @@ class CumulativeEqualPacing(Pacing):
     def should_bid(self, value) -> bool:
         return self.budget_spent < self.budget_daily and self.budget_active > value
 
-    def charge(self, value):
-        self.budget_spent += value
-        self.budget_active -= value
+    def charge(self, ec: EventCollector, tick: Tick, bid: Bid):
+        self.budget_spent += bid.value
+        self.budget_active -= bid.value
 
-    def adjust(self):
+    def adjust(self, ec: EventCollector, tick: Tick):
         self.budget_active += self.budget_period
 
 
@@ -73,11 +70,11 @@ class RecomputedEqualPacing(Pacing):
     def should_bid(self, value) -> bool:
         return self.budget_spent < self.budget_daily and self.budget_active > value
 
-    def charge(self, value):
-        self.budget_spent += value
-        self.budget_active -= value
+    def charge(self, ec: EventCollector, tick: Tick, bid: Bid):
+        self.budget_spent += bid.value
+        self.budget_active -= bid.value
 
-    def adjust(self):
+    def adjust(self, ec: EventCollector, tick: Tick):
         budget_remaining = self.budget_daily - self.budget_spent
         self.budget_active = math.ceil(budget_remaining / self.periods_remaining)
         self.periods_remaining -= 1
@@ -117,10 +114,10 @@ class LinkedInPacing(Pacing):
     def should_bid(self, value) -> bool:
         return self.budget_spent < self.budget_daily and self.rng.random() < self.ptr
 
-    def charge(self, value):
-        self.budget_spent += value
+    def charge(self, ec: EventCollector, tick: Tick, bid: Bid):
+        self.budget_spent += bid.value
 
-    def adjust(self):
+    def adjust(self, ec: EventCollector, tick: Tick):
         if self.period == 0:
             self.period += 1
             return
@@ -147,9 +144,6 @@ class Campaign:
         if self.pacing.should_bid(self.bid_value):
             return Bid(self.id_, self.bid_value)
 
-    def notify_win(self, win: Bid):
-        self.pacing.charge(win.value)
-
     @property
     def budget_daily(self) -> int:
         return self.pacing.budget_daily
@@ -159,13 +153,19 @@ class Auction:
     def __init__(self, campaigns: List[Campaign]):
         self.campaigns = campaigns
 
-    def run(self) -> Optional[Bid]:
+    def run(self, ec: EventCollector, tick: Tick) -> Optional[Bid]:
         bids = sorted(
             list(filter(None, (c.bid() for c in self.campaigns))),
             key=lambda b: b.value,
             reverse=True
         )
-        return bids[0] if bids else None
+
+        win = bids[0] if bids else None
+
+        kind = AuctionEvents.WIN if win else AuctionEvents.NO_WIN
+        ec.publish(Event(tick, kind, win))
+
+        return win
 
 
 class AdServer(Action):
@@ -177,29 +177,15 @@ class AdServer(Action):
     def run(self, ec: EventCollector, tick: int):
         wins: List[Bid] = []
 
-        # adjust budgets
         for c in self.campaigns.values():
-            c.pacing.adjust()
+            c.pacing.adjust(ec, tick)
 
         # run all auctions in period
         for _ in range(self.traffic_distribution[tick]):
-            win = self.auction.run()
+            win = self.auction.run(ec, tick)
             if win:
                 wins.append(win)
-                ec.publish(Event(tick, AuctionEvents.WIN, win))
-            else:
-                ec.publish(Event(tick, AuctionEvents.NO_BID, None))
 
         # charge for all auctions in period
         for w in wins:
-            self.campaigns[w.campaign_id].notify_win(w)
-
-
-def budget_spending_over_time(win_events: List[Event]):
-    results: Dict[int, Dict[int, int]] = defaultdict(lambda: defaultdict(lambda: 0))
-
-    for e in win_events:
-        w: Bid = e.data
-        results[w.campaign_id][e.tick] += w.value
-
-    return results
+            self.campaigns[w.campaign_id].pacing.charge(ec, tick, w)
