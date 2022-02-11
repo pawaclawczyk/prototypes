@@ -7,7 +7,7 @@ from typing import List, Optional, Dict
 
 import numpy as np
 
-from simulation import Action, Event, Future
+from simulation import Action, Event
 
 
 @dataclass
@@ -172,7 +172,7 @@ class AdServer(Action):
         self.auction = auction
         self.campaigns: Dict[int, Campaign] = {c.id_: c for c in campaigns}
 
-    def run(self, tick: int, messages: List[Future]) -> (List[Event], List[Future]):
+    def run(self, tick: int) -> List[Event]:
         events: List[Event] = []
         wins: List[Bid] = []
 
@@ -193,7 +193,7 @@ class AdServer(Action):
         for w in wins:
             self.campaigns[w.campaign_id].notify_win(w)
 
-        return events, []
+        return events
 
 
 def budget_spending_over_time(win_events: List[Event]):
