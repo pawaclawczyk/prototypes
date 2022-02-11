@@ -1,27 +1,17 @@
-from collections import defaultdict
 from typing import List
 
 import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from pacing import AdServer
-from simulation import Message
-
-
-def split_messages_by_kind(messages: List[Message]):
-    result = defaultdict(list)
-    for m in messages:
-        result[m.kind].append(m)
-    return result
+from simulation import Event
 
 
 def line_plot(arr):
     sns.relplot(data=arr, kind="line", height=10, aspect=3)
 
 
-def analyse(events, campaigns, ticks):
-    wins = split_messages_by_kind(events)[AdServer.EVENT_KIND_WIN]
+def analyse(wins: List[Event], campaigns, ticks):
     base_df = pd.DataFrame.from_records([(w.tick, w.data.campaign_id, w.data.value) for w in wins],
                                         columns=["time", "campaign", "value"])
     agg_base_df = base_df.groupby(by=["time", "campaign"]).sum()
@@ -40,8 +30,7 @@ def analyse(events, campaigns, ticks):
     line_plot(norm_prog)
 
 
-def stats(events):
-    wins = split_messages_by_kind(events)[AdServer.EVENT_KIND_WIN]
+def stats(wins: List[Event]):
     base_df = pd.DataFrame.from_records([(w.tick, w.data.campaign_id, w.data.value) for w in wins],
                                         columns=["time", "campaign", "value"])
     return base_df.groupby(by=["campaign"]).agg(

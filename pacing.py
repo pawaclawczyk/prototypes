@@ -7,7 +7,12 @@ from typing import List, Optional, Dict
 
 import numpy as np
 
-from simulation import Action, Event
+from simulation import Action, Event, EventCollector
+
+
+class AuctionEvents:
+    WIN = "win"
+    NO_BID = "no-bid"
 
 
 @dataclass
@@ -164,16 +169,12 @@ class Auction:
 
 
 class AdServer(Action):
-    EVENT_KIND_WIN = 1
-    EVENT_KIND_NO_WIN = 2
-
     def __init__(self, traffic_distribution: List[int], auction: Auction, campaigns: List[Campaign]):
         self.traffic_distribution = traffic_distribution
         self.auction = auction
         self.campaigns: Dict[int, Campaign] = {c.id_: c for c in campaigns}
 
-    def run(self, tick: int) -> List[Event]:
-        events: List[Event] = []
+    def run(self, ec: EventCollector, tick: int):
         wins: List[Bid] = []
 
         # adjust budgets
@@ -185,15 +186,13 @@ class AdServer(Action):
             win = self.auction.run()
             if win:
                 wins.append(win)
-                events.append(Event(tick, self.EVENT_KIND_WIN, win))
+                ec.publish(Event(tick, AuctionEvents.WIN, win))
             else:
-                events.append(Event(tick, self.EVENT_KIND_NO_WIN, None))
+                ec.publish(Event(tick, AuctionEvents.NO_BID, None))
 
         # charge for all auctions in period
         for w in wins:
             self.campaigns[w.campaign_id].notify_win(w)
-
-        return events
 
 
 def budget_spending_over_time(win_events: List[Event]):
