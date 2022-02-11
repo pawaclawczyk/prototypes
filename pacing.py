@@ -122,8 +122,6 @@ class LinkedInPacing(Pacing):
 
         a = (self.forecast[self.period] / self.forecast_total) * self.budget_daily
 
-
-
         if self.budget_spent > a:
             new_ptr = self.ptr * (1.0 - self.ar)
             self.ptr = max(new_ptr, 0.0)
