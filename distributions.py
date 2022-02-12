@@ -2,25 +2,25 @@ import numpy as np
 from scipy.stats import norm, uniform
 
 
-def normalize(arr: np.array) -> np.array:
+def normalize(arr: np.ndarray) -> np.ndarray:
     return arr / arr.sum()
 
 
-def uniform_dist(ticks):
-    points = np.linspace(uniform.ppf(0.01), uniform.ppf(0.99), ticks)
+def uniform_dist(n: int):
+    points = np.linspace(uniform.ppf(0.01), uniform.ppf(0.99), n)
     return normalize(uniform.pdf(points))
 
 
-def normal_dist(ticks, loc=0.0, scale=1.0):
-    points = np.linspace(norm.ppf(0.001), norm.ppf(0.999), ticks)
+def normal_dist(n: int, loc: float = 0.0, scale: float = 1.0):
+    points = np.linspace(norm.ppf(0.01), norm.ppf(0.99), n)
     return normalize(norm.pdf(points, loc=loc, scale=scale))
 
 
-def custom_dist(ticks):
-    a = normal_dist(ticks, -1, 0.5) * 0.75
-    b = normal_dist(ticks, 1.5, 0.5)
+def custom_dist(n: int):
+    a = normal_dist(n, -1, 0.5) * 0.75
+    b = normal_dist(n, 1.5, 0.5)
     return normalize(a + b)
 
 
-def traffic_distribution(dist, traffic):
-    return (normalize(dist) * traffic).round().astype(int)
+def traffic_dist(dist: np.ndarray, reqs: int) -> np.ndarray:
+    return (normalize(dist) * reqs).round().astype(int)

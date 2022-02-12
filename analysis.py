@@ -7,7 +7,7 @@ import seaborn as sns
 from simulation import Event
 
 
-def line_plot(arr):
+def plot_line(arr):
     sns.relplot(data=arr, kind="line", height=10, aspect=3)
 
 
@@ -27,7 +27,7 @@ def analyse(wins: List[Event], campaigns, ticks):
     prog = vals.cumsum()
     budgets = pd.DataFrame(data=[[c.pacing.budget_daily for c in campaigns]], columns=[c.id_ for c in campaigns])
     norm_prog = prog / budgets.iloc[0]
-    line_plot(norm_prog)
+    plot_line(norm_prog)
 
 
 def stats(wins: List[Event]):
