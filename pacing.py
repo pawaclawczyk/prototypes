@@ -1,6 +1,7 @@
 import random
-from dataclasses import dataclass
-from typing import List, Optional
+from collections import defaultdict
+from dataclasses import dataclass, field
+from typing import List, Optional, Iterable
 
 import numpy as np
 import pandas as pd
@@ -279,3 +280,85 @@ class AdServer(Process):
             win = self.auction.run(t)
             if win:
                 self.wins.append(win)
+
+
+@dataclass
+class CampaignState:
+    budget: int = 0
+    alloc: int = 0
+
+
+@dataclass
+class CampaignV2:
+    cid: int
+    planned_budget: int
+    bid_value: int
+    state: CampaignState = field(default_factory=CampaignState)
+
+
+class Pacing:
+    @staticmethod
+    def init(campaign: CampaignV2):
+        campaign.state.budget = campaign.planned_budget
+
+    @staticmethod
+    def bid(campaign: CampaignV2) -> tuple:
+        print(campaign)
+        if campaign.bid_value <= (campaign.state.budget - campaign.state.alloc):
+            campaign.state.alloc += campaign.bid_value
+            return "BID", campaign.cid, campaign.bid_value
+        else:
+            return "NO BID", campaign.cid, 0
+
+    @staticmethod
+    def notify(campaign: CampaignV2, wins):
+        for win in wins:
+            campaign.state.budget -= win[2]
+        campaign.state.alloc = 0
+
+
+class AdServerV2(Process):
+    """The ad server process simulates a single auction.
+
+    It collects bids from all campaigns and selects the winning bid.
+    It consolidates the campaigns budgets at the beginning of each time window
+     (equivalent for ending of the previous time window).
+
+    """
+
+    def __init__(self, pacing: Pacing, campaigns: List[CampaignV2]):
+        self.pacing = pacing
+        self.campaigns = dict((c.cid, c) for c in campaigns)
+        self.wins = []
+
+        for campaign in self.campaigns.values():
+            pacing.init(campaign)
+
+    def run(self, window: int, request: int) -> Iterable:
+        if request == 0:
+            self.process_wins()
+        bids = self.collect_bids()
+        win = self.auction(bids)
+        self.wins.append(win)
+        yield from bids
+        yield win
+
+    def collect_bids(self):
+        return [self.pacing.bid(c) for c in self.campaigns.values()]
+
+    @staticmethod
+    def auction(bids):
+        bids = filter(lambda t: t[0] == "BID", bids)
+        bids = sorted(bids, key=lambda t: t[2], reverse=True)
+        bid = bids[0] if bids else None
+        return ("WIN", bid[1], bid[2]) if bid else ("NO WIN", None, None)
+
+    def process_wins(self):
+        wins_by_camp = defaultdict(list)
+        for win in self.wins:
+            if win[0] == "NO WIN":
+                continue
+            wins_by_camp[win[1]].append(win)
+        for cid, wins in wins_by_camp.items():
+            self.pacing.notify(self.campaigns[cid], wins)
+        self.wins = []
