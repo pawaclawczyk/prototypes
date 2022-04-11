@@ -1,60 +1,53 @@
-from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, List, Iterable
+from typing import Iterable
 
 import numpy as np
 
-Tick = int
-Kind = str
-
 
 @dataclass
-class Event:
-    tick: Tick
-    kind: Kind
-    data: Any
+class Request:
+    request: int
+    window: int
+    request_in_window: int
 
 
-class EventCollector:
-    def __init__(self):
-        self._queues = defaultdict(list)
+class Response:
+    __slots__ = ["request", "window", "request_in_window"]
 
-    def publish(self, ev: Event):
-        self._queues[ev.kind].append(ev)
+    def __init__(self, request: Request):
+        self.request = request.request
+        self.window = request.window
+        self.request_in_window = request.request_in_window
 
-    def fetch(self, kind: int) -> List[Event]:
-        return self._queues[kind]
+    def to_dict(self):
+        return dict((s, self.__getattribute__(s)) for s in self.__slots__)
+
+    def __repr__(self):
+        return str(self.to_dict())
 
 
 class Process:
     """Process handles a single request.
 
-    It receives the number of the window and the number of the request within the window."""
+    It's run with the number of the current window,
+     and the number of the request within that window.
 
-    def run(self, window: int, request: int) -> Iterable: pass
+    It's notified on the start and the end of a time window, with its number.
+    """
 
+    def run(self, request: Request) -> Iterable: pass
 
-class DummyProcess(Process):
-    def run(self, window: int, request: int):
-        yield True
+    def notify_window_start(self, window: int) -> None: pass
+
+    def notify_window_end(self, window: int) -> None: pass
 
 
 class Simulation:
-    def __init__(self, ticks: Tick, process: Process):
-        self.ticks = ticks
-        self.process = process
-
-    def run(self):
-        for t in range(self.ticks):
-            self.process.run(t)
-
-
-class SimulationV2:
     """Runs traffic simulation based on provided traffic distribution.
 
     The traffic distribution is represented as 1-D array, each value represents number of requests within a time window.
 
-    On each request the `process` is called. A process is expected to return events as an iterable data structure.
+    It calls a process on each request.
     """
 
     def __init__(self, dist: np.ndarray, process: Process):
@@ -62,6 +55,9 @@ class SimulationV2:
         self.process = process
 
     def run(self):
+        request = 0
         for window, requests in enumerate(self.dist):
-            for request in range(requests):
-                yield from self.process.run(window, request)
+            for request_in_window in range(requests):
+                yield from self.process.run(Request(request, window, request_in_window))
+                request += 1
+            self.process.notify_window_end(window)

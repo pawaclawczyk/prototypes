@@ -1,323 +1,239 @@
 import random
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import List, Optional, Iterable
+from typing import List, Iterable
 
 import numpy as np
-import pandas as pd
 
-from simulation import Process, Event, EventCollector, Tick
-
-
-class AuctionEvents:
-    WIN = "win"
-    NO_WIN = "no-win"
+from simulation import Process, Request, Response
 
 
-@dataclass
-class Bid:
-    campaign_id: int
-    value: int
-
-
-@dataclass
-class CampaignParams:
-    ID: int
-    bid_val: int
-    imps_target: int
-    budget_limit: int
-
-
-class Campaign:
-    def __init__(self, params: CampaignParams):
-        self.params = params
-        self.spent: int = 0
-        self.chunk: int = 0
-        self.ptr: float = 0.0
-
-
-class Pacer:
-    def server_process(self, t: Tick, c: Campaign, bids: List[Bid]):
-        pass
-
-    def bidder_process(self, c: Campaign) -> Optional[Bid]:
-        pass
-
-
-class AsapPacer(Pacer):
-    def server_process(self, t: Tick, c: Campaign, bids: List[Bid]):
-        val = sum(b.value for b in bids if b.campaign_id == c.params.ID)
-        c.spent += val
-
-    def bidder_process(self, c: Campaign):
-        if (c.params.budget_limit - c.spent) >= c.params.bid_val:
-            return Bid(c.params.ID, c.params.bid_val)
-
-
-class EqualPacer(Pacer):
-    def __init__(self, periods: int):
-        self.periods = periods
-
-    def server_process(self, t: Tick, c: Campaign, bids: List[Bid]):
-        val = sum(b.value for b in bids if b.campaign_id == c.params.ID)
-        c.spent += val
-        c.chunk += c.params.budget_limit // self.periods - val
-
-    def bidder_process(self, c: Campaign):
-        if c.chunk >= c.params.bid_val:
-            return Bid(c.params.ID, c.params.bid_val)
-
-
-class ThrottledPacer(Pacer):
-    ptr: float = 0.1
-    ar: float = 0.1
-    ff_end: int = 22 * 60
-
-    def __init__(self, forecast: np.ndarray, fast_finish: bool = False):
-        if fast_finish:
-            forecast = self._apply_fast_finish(forecast, self.ff_end)
-        n = forecast.sum()
-        f = forecast.cumsum()
-        self.forecast = f / n
-
-    def server_process(self, t: Tick, c: Campaign, bids: List[Bid]):
-        val = sum(b.value for b in bids if b.campaign_id == c.params.ID)
-        c.spent += val
-        if t == 0:
-            c.ptr = self.ptr
-        else:
-            a = self.forecast[t] * c.params.budget_limit
-            if c.spent > a:
-                c.ptr = max(c.ptr * (1 - self.ar), 0)
-            elif c.spent < a:
-                c.ptr = min(c.ptr * (1 + self.ar), 1)
-
-    def bidder_process(self, c: Campaign):
-        if random.random() < c.ptr:
-            if (c.params.budget_limit - c.spent) >= c.params.bid_val:
-                return Bid(c.params.ID, c.params.bid_val)
-
-    @staticmethod
-    def _apply_fast_finish(forecast: np.ndarray, end_at: Tick):
-        f = pd.Series(forecast.copy())
-        n = forecast[end_at:].sum()
-        f[end_at:] = 0
-        r = np.random.randint(0, end_at, int(n))
-        p = pd.Series(r).groupby(by=r).aggregate(np.size)
-        p = p.reindex(f.index.values, fill_value=0)
-
-        return f + p
-
-
-# class Pacing:
-#     budget_daily: int
+# class Pacer:
+#     def server_process(self, t: Tick, c: Campaign, bids: List[Bid]):
+#         pass
 #
-#     def should_bid(self, value: int, ctx: Context) -> bool: pass
-#
-#     def charge(self, bid: Bid, ctx: Context): pass
-#
-#     def adjust(self, ctx: Context): pass
+#     def bidder_process(self, c: Campaign) -> Optional[Bid]:
+#         pass
 #
 #
-# class AsapPacing(Pacing):
-#     def __init__(self, budget_daily):
-#         self.budget_daily = budget_daily
-#         self.budget_spent = 0
+# class AsapPacer(Pacer):
+#     def server_process(self, t: Tick, c: Campaign, bids: List[Bid]):
+#         val = sum(b.value for b in bids if b.campaign_id == c.params.ID)
+#         c.spent += val
 #
-#     def should_bid(self, value: int, ctx: Context) -> bool:
-#         return (self.budget_daily - self.budget_spent) >= value
-#
-#     def charge(self, bid: Bid, ctx: Context):
-#         self.budget_spent += bid.value
+#     def bidder_process(self, c: Campaign):
+#         if (c.params.budget_limit - c.spent) >= c.params.bid_val:
+#             return Bid(c.params.ID, c.params.bid_val)
 #
 #
-# class CumulativeEqualPacing(Pacing):
-#     def __init__(self, budget_daily, periods):
-#         self.budget_daily = budget_daily
-#         self.budget_spent = 0
-#         self.budget_period = math.ceil(budget_daily / periods)
-#         self.budget_active = 0
+# class EqualPacer(Pacer):
+#     def __init__(self, periods: int):
+#         self.periods = periods
 #
-#     def should_bid(self, value: int, ctx: Context) -> bool:
-#         return self.budget_spent < self.budget_daily and self.budget_active > value
+#     def server_process(self, t: Tick, c: Campaign, bids: List[Bid]):
+#         val = sum(b.value for b in bids if b.campaign_id == c.params.ID)
+#         c.spent += val
+#         c.chunk += c.params.budget_limit // self.periods - val
 #
-#     def charge(self, bid: Bid, ctx: Context):
-#         self.budget_spent += bid.value
-#         self.budget_active -= bid.value
-#
-#     def adjust(self, ctx: Context):
-#         self.budget_active += self.budget_period
+#     def bidder_process(self, c: Campaign):
+#         if c.chunk >= c.params.bid_val:
+#             return Bid(c.params.ID, c.params.bid_val)
 #
 #
-# class RecomputedEqualPacing(Pacing):
-#     def __init__(self, budget_daily, periods):
-#         self.budget_daily = budget_daily
-#         self.budget_spent = 0
-#         self.budget_active = 0
-#         self.periods_remaining = periods
+# class ThrottledPacer(Pacer):
+#     ptr: float = 0.1
+#     ar: float = 0.1
+#     ff_end: int = 22 * 60
 #
-#     def should_bid(self, value: int, ctx: Context) -> bool:
-#         return self.budget_spent < self.budget_daily and self.budget_active > value
+#     def __init__(self, forecast: np.ndarray, fast_finish: bool = False):
+#         if fast_finish:
+#             forecast = self._apply_fast_finish(forecast, self.ff_end)
+#         n = forecast.sum()
+#         f = forecast.cumsum()
+#         self.forecast = f / n
 #
-#     def charge(self, bid: Bid, ctx: Context):
-#         self.budget_spent += bid.value
-#         self.budget_active -= bid.value
+#     def server_process(self, t: Tick, c: Campaign, bids: List[Bid]):
+#         val = sum(b.value for b in bids if b.campaign_id == c.params.ID)
+#         c.spent += val
+#         if t == 0:
+#             c.ptr = self.ptr
+#         else:
+#             a = self.forecast[t] * c.params.budget_limit
+#             if c.spent > a:
+#                 c.ptr = max(c.ptr * (1 - self.ar), 0)
+#             elif c.spent < a:
+#                 c.ptr = min(c.ptr * (1 + self.ar), 1)
 #
-#     def adjust(self, ctx: Context):
-#         budget_remaining = self.budget_daily - self.budget_spent
-#         self.budget_active = math.ceil(budget_remaining / self.periods_remaining)
-#         self.periods_remaining -= 1
+#     def bidder_process(self, c: Campaign):
+#         if random.random() < c.ptr:
+#             if (c.params.budget_limit - c.spent) >= c.params.bid_val:
+#                 return Bid(c.params.ID, c.params.bid_val)
 #
+#     @staticmethod
+#     def _apply_fast_finish(forecast: np.ndarray, end_at: Tick):
+#         f = pd.Series(forecast.copy())
+#         n = forecast[end_at:].sum()
+#         f[end_at:] = 0
+#         r = np.random.randint(0, end_at, int(n))
+#         p = pd.Series(r).groupby(by=r).aggregate(np.size)
+#         p = p.reindex(f.index.values, fill_value=0)
 #
-# def redistribute(forecast: np.ndarray, hot_end: int) -> np.ndarray:
-#     forecast = forecast.copy()
-#
-#     s_before = forecast.sum()
-#
-#     n = forecast[len(forecast) - hot_end - 1:].sum()
-#
-#     forecast[len(forecast) - hot_end - 1:] = 0
-#     for _ in range(n):
-#         i = random.randint(len(forecast) - 2 * hot_end - 1, len(forecast) - hot_end - 1)
-#         forecast[i] += 1
-#
-#     s_after = forecast.sum()
-#
-#     assert s_before == s_after
-#
-#     return forecast
-#
-#
-# class LinkedInPacing(Pacing):
-#     def __init__(self, budget_daily: int, forecast: np.ndarray, hot_end: int = 0, ptr: float = 0.1, ar: float = 0.1):
-#         self.budget_daily = budget_daily
-#         self.budget_spent = 0
-#         fct = redistribute(forecast, hot_end)
-#         self.forecast = fct.cumsum()
-#         self.forecast_total = fct.sum()
-#         self.ptr = ptr
-#         self.ar = ar
-#         self.rng = random.Random(x=datetime.utcnow().microsecond * budget_daily)
-#         self.period = 0
-#
-#     def should_bid(self, value: int, ctx: Context) -> bool:
-#         return self.budget_spent < self.budget_daily and self.rng.random() < self.ptr
-#
-#     def charge(self, bid: Bid, ctx: Context):
-#         self.budget_spent += bid.value
-#
-#     def adjust(self, ctx: Context):
-#         if self.period == 0:
-#             self.period += 1
-#             return
-#
-#         a = (self.forecast[self.period] / self.forecast_total) * self.budget_daily
-#
-#         if self.budget_spent > a:
-#             new_ptr = self.ptr * (1.0 - self.ar)
-#             self.ptr = max(new_ptr, 0.0)
-#         elif self.budget_spent < a:
-#             new_ptr = self.ptr * (1.0 + self.ar)
-#             self.ptr = min(new_ptr, 1.0)
-#
-#         self.period += 1
-#
-#
-# class Campaign:
-#     def __init__(self, id_: int, bid_value: int, pacing: Pacing):
-#         self.id_ = id_
-#         self.bid_value = bid_value
-#         self.pacing = pacing
-#
-#     def bid(self, ctx: Context) -> Optional[Bid]:
-#         if self.pacing.should_bid(self.bid_value, ctx):
-#             return Bid(self.id_, self.bid_value)
-#
-#     @property
-#     def budget_daily(self) -> int:
-#         return self.pacing.budget_daily
-
-
-class Auction:
-    def __init__(self, ec: EventCollector, pacer: Pacer, camps: List[Campaign], ):
-        self.ec = ec
-        self.pacer = pacer
-        self.campaigns = camps
-
-    def run(self, t: Tick) -> Optional[Bid]:
-        win: Optional[Bid] = None
-
-        for c in self.campaigns:
-            b = self.pacer.bidder_process(c)
-            if not win or (b and b.value > win.value):
-                win = b
-
-        if win:
-            self.ec.publish(Event(t, AuctionEvents.WIN, win))
-        else:
-            self.ec.publish(Event(t, AuctionEvents.NO_WIN, win))
-
-        return win
-
-
-class AdServer(Process):
-    def __init__(self, ec: EventCollector, traffic_dist: np.ndarray, pacer: Pacer, camps_params: List[CampaignParams]):
-        self.ec = ec
-        self.traffic_dist = traffic_dist
-        self.pacer = pacer
-        self.camps = [Campaign(cp) for cp in camps_params]
-
-        self.auction = Auction(self.ec, self.pacer, self.camps)
-
-        self.wins: List[Bid] = []
-
-    def run(self, t: Tick):
-        for c in self.camps:
-            self.pacer.server_process(t, c, self.wins)
-        self.wins = []
-
-        for _ in range(self.traffic_dist[t]):
-            win = self.auction.run(t)
-            if win:
-                self.wins.append(win)
+#         return f + p
 
 
 @dataclass
 class CampaignState:
     budget: int = 0
     alloc: int = 0
+    ptr: float = 0
+    rng: random.Random = None
 
 
 @dataclass
-class CampaignV2:
-    cid: int
+class Campaign:
+    campaign_id: int
     planned_budget: int
     bid_value: int
     state: CampaignState = field(default_factory=CampaignState)
 
 
+class AdServerResponse(Response):
+    __slots__ = Response.__slots__ + ["kind", "campaign_id", "bid_value"]
+
+    def __init__(self, request: Request):
+        super().__init__(request)
+        self.kind = None
+        self.campaign_id = None
+        self.bid_value = None
+
+    @staticmethod
+    def bid(request: Request, campaign_id: int, bid_value: int) -> 'AdServerResponse':
+        e = AdServerResponse(request)
+        e.kind = "bid"
+        e.campaign_id = campaign_id
+        e.bid_value = bid_value
+        return e
+
+    @staticmethod
+    def no_bid(request: Request, campaign_id: int) -> 'AdServerResponse':
+        e = AdServerResponse(request)
+        e.kind = "no bid"
+        e.campaign_id = campaign_id
+        return e
+
+    @staticmethod
+    def win(request: Request, bid: 'AdServerResponse') -> 'AdServerResponse':
+        e = AdServerResponse(request)
+        e.kind = "win"
+        e.campaign_id = bid.campaign_id
+        e.bid_value = bid.bid_value
+        return e
+
+    @staticmethod
+    def no_win(request: Request) -> 'AdServerResponse':
+        e = AdServerResponse(request)
+        e.kind = "no win"
+        return e
+
+
 class Pacing:
     @staticmethod
-    def init(campaign: CampaignV2):
+    def init(campaign: Campaign):
         campaign.state.budget = campaign.planned_budget
 
     @staticmethod
-    def bid(campaign: CampaignV2) -> tuple:
-        print(campaign)
+    def bid(campaign: Campaign, request: Request) -> AdServerResponse:
         if campaign.bid_value <= (campaign.state.budget - campaign.state.alloc):
             campaign.state.alloc += campaign.bid_value
-            return "BID", campaign.cid, campaign.bid_value
+            return AdServerResponse.bid(request, campaign.campaign_id, campaign.bid_value)
         else:
-            return "NO BID", campaign.cid, 0
+            return AdServerResponse.no_bid(request, campaign.campaign_id)
 
     @staticmethod
-    def notify(campaign: CampaignV2, wins):
+    def notify(window: int, campaign: Campaign, wins: List[AdServerResponse]):
         for win in wins:
-            campaign.state.budget -= win[2]
+            campaign.state.budget -= win.bid_value
         campaign.state.alloc = 0
 
 
-class AdServerV2(Process):
+# class ThrottledPacer(Pacer):
+#     ptr: float = 0.1
+#     ar: float = 0.1
+#     ff_end: int = 22 * 60
+#
+#     def __init__(self, forecast: np.ndarray, fast_finish: bool = False):
+#         if fast_finish:
+#             forecast = self._apply_fast_finish(forecast, self.ff_end)
+#         n = forecast.sum()
+#         f = forecast.cumsum()
+#         self.forecast = f / n
+#
+#     def server_process(self, t: Tick, c: Campaign, bids: List[Bid]):
+#         val = sum(b.value for b in bids if b.campaign_id == c.params.ID)
+#         c.spent += val
+#         if t == 0:
+#             c.ptr = self.ptr
+#         else:
+#             a = self.forecast[t] * c.params.budget_limit
+#             if c.spent > a:
+#                 c.ptr = max(c.ptr * (1 - self.ar), 0)
+#             elif c.spent < a:
+#                 c.ptr = min(c.ptr * (1 + self.ar), 1)
+#
+#     def bidder_process(self, c: Campaign):
+#         if random.random() < c.ptr:
+#             if (c.params.budget_limit - c.spent) >= c.params.bid_val:
+#                 return Bid(c.params.ID, c.params.bid_val)
+#
+#     @staticmethod
+#     def _apply_fast_finish(forecast: np.ndarray, end_at: Tick):
+#         f = pd.Series(forecast.copy())
+#         n = forecast[end_at:].sum()
+#         f[end_at:] = 0
+#         r = np.random.randint(0, end_at, int(n))
+#         p = pd.Series(r).groupby(by=r).aggregate(np.size)
+#         p = p.reindex(f.index.values, fill_value=0)
+#
+#         return f + p
+
+class ThrottledPacing(Pacing):
+    ar = 0.1
+    ptr = 0.1
+
+    def __init__(self, forecast: np.ndarray):
+        # convert request distribution to cumulative probability distribution
+        # in real scenario, every campaign would have its own forecast
+        self.forecast = forecast.cumsum() / forecast.sum()
+
+    def init(self, campaign: Campaign):
+        campaign.state.budget = campaign.planned_budget
+        campaign.state.ptr = self.ptr
+        campaign.state.rng = random.Random(random.randbytes(16))
+
+    @staticmethod
+    def bid(campaign: Campaign, request: Request) -> AdServerResponse:
+        if campaign.state.rng.random() <= campaign.state.ptr:
+            if campaign.bid_value <= (campaign.state.budget - campaign.state.alloc):
+                campaign.state.alloc += campaign.bid_value
+                return AdServerResponse.bid(request, campaign.campaign_id, campaign.bid_value)
+
+        return AdServerResponse.no_bid(request, campaign.campaign_id)
+
+    def notify(self, window: int, campaign: Campaign, wins: List[AdServerResponse]):
+        for win in wins:
+            campaign.state.budget -= win.bid_value
+        campaign.state.alloc = 0
+        self.adjust_ptr(window, campaign)
+
+    def adjust_ptr(self, window: int, campaign: Campaign):
+        a = self.forecast[window] * campaign.planned_budget
+        if campaign.state.budget > a:
+            campaign.state.ptr = max(campaign.state.ptr * (1 - self.ar), 0)
+        elif campaign.state.budget < a:
+            campaign.state.ptr = min(campaign.state.ptr * (1 + self.ar), 1)
+
+
+class AdServer(Process):
     """The ad server process simulates a single auction.
 
     It collects bids from all campaigns and selects the winning bid.
@@ -326,39 +242,40 @@ class AdServerV2(Process):
 
     """
 
-    def __init__(self, pacing: Pacing, campaigns: List[CampaignV2]):
+    def __init__(self, pacing: Pacing, campaigns: List[Campaign]):
         self.pacing = pacing
-        self.campaigns = dict((c.cid, c) for c in campaigns)
-        self.wins = []
+        self.campaigns = dict((c.campaign_id, c) for c in campaigns)
+        self.wins: List[AdServerResponse] = []
 
         for campaign in self.campaigns.values():
             pacing.init(campaign)
 
-    def run(self, window: int, request: int) -> Iterable:
-        if request == 0:
-            self.process_wins()
-        bids = self.collect_bids()
-        win = self.auction(bids)
+    def run(self, request: Request) -> Iterable[AdServerResponse]:
+        bids = self.collect_bids(request)
+        win = self.auction(request, bids)
         self.wins.append(win)
         yield from bids
         yield win
 
-    def collect_bids(self):
-        return [self.pacing.bid(c) for c in self.campaigns.values()]
+    def notify_window_end(self, window: int) -> None:
+        self.process_wins(window)
+
+    def collect_bids(self, request: Request) -> List[AdServerResponse]:
+        return [self.pacing.bid(c, request) for c in self.campaigns.values()]
 
     @staticmethod
-    def auction(bids):
-        bids = filter(lambda t: t[0] == "BID", bids)
-        bids = sorted(bids, key=lambda t: t[2], reverse=True)
-        bid = bids[0] if bids else None
-        return ("WIN", bid[1], bid[2]) if bid else ("NO WIN", None, None)
+    def auction(request: Request, bids: List[AdServerResponse]):
+        bids = [b for b in bids if b.kind == "bid"]
+        bids = sorted(bids, key=lambda b: b.bid_value, reverse=True)
 
-    def process_wins(self):
+        return AdServerResponse.win(request, bids[0]) if bids else AdServerResponse.no_win(request)
+
+    def process_wins(self, window: int):
         wins_by_camp = defaultdict(list)
         for win in self.wins:
-            if win[0] == "NO WIN":
+            if win.kind != "win":
                 continue
-            wins_by_camp[win[1]].append(win)
+            wins_by_camp[win.campaign_id].append(win)
         for cid, wins in wins_by_camp.items():
-            self.pacing.notify(self.campaigns[cid], wins)
+            self.pacing.notify(window, self.campaigns[cid], wins)
         self.wins = []
