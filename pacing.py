@@ -1,7 +1,7 @@
 import random
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import List, Iterable, Dict
+from typing import List, Iterable, Dict, Callable
 
 import numpy as np
 
@@ -55,11 +55,11 @@ class AdServerEvent(Event):
         return e
 
     @staticmethod
-    def win(request: Request, bid: 'AdServerEvent') -> 'AdServerEvent':
+    def win(request: Request, campaign_id: int, bid_value: int) -> 'AdServerEvent':
         e = AdServerEvent(request)
         e.kind = "win"
-        e.campaign_id = bid.campaign_id
-        e.bid_value = bid.bid_value
+        e.campaign_id = campaign_id
+        e.bid_value = bid_value
         return e
 
     @staticmethod
@@ -163,6 +163,26 @@ class ThrottledPacing(AsapPacing):
             campaign.state.ptr = min(campaign.state.ptr * (1 + self.AR), 1)
 
 
+def first_price_auction(request: Request, bids: List[AdServerEvent]) -> AdServerEvent:
+    """Select highest bid as the win."""
+    bids = [b for b in bids if b.kind == "bid"]
+    if not bids:
+        return AdServerEvent.no_win(request)
+    bid = sorted(bids, key=lambda b: b.bid_value, reverse=True)[0]
+    return AdServerEvent.win(request, bid.campaign_id, bid.bid_value)
+
+
+def second_price_auction(request: Request, bids: List[AdServerEvent]) -> AdServerEvent:
+    """Select highest bid as the win, but use the bid value from the second one."""
+    bids = [b for b in bids if b.kind == "bid"]
+    if not bids:
+        return AdServerEvent.no_win(request)
+    bids = sorted(bids, key=lambda b: b.bid_value, reverse=True)
+    if len(bids) == 1:
+        return AdServerEvent.win(request, bids[0].campaign_id, bids[0].bid_value)
+    return AdServerEvent.win(request, bids[0].campaign_id, bids[1].bid_value)
+
+
 class AdServer(Process):
     """The ad server process simulates a single auction.
 
@@ -171,8 +191,10 @@ class AdServer(Process):
     At the end of time window it consolidates the campaigns budgets.
     """
 
-    def __init__(self, pacing: AsapPacing, campaigns: List[Campaign]):
+    def __init__(self, pacing: AsapPacing, select_win: Callable[[Request, List[AdServerEvent]], AdServerEvent],
+                 campaigns: List[Campaign]):
         self.pacing = pacing
+        self.select_win = select_win
         self.campaigns = dict((c.campaign_id, c) for c in campaigns)
         self.wins: List[AdServerEvent] = []
 
@@ -182,7 +204,7 @@ class AdServer(Process):
     def run(self, request: Request) -> Iterable[AdServerEvent]:
         """Runs an auction."""
         bids = self.collect_bids(request)
-        win = self.auction(request, bids)
+        win = self.select_win(request, bids)
         self.wins.append(win)
         yield from bids
         yield win
@@ -195,14 +217,6 @@ class AdServer(Process):
     def collect_bids(self, request: Request) -> List[AdServerEvent]:
         """Collects bids from each campaign."""
         return [self.pacing.bid(c, request) for c in self.campaigns.values()]
-
-    @staticmethod
-    def auction(request: Request, bids: List[AdServerEvent]):
-        """First price auction."""
-        bids = [b for b in bids if b.kind == "bid"]
-        bids = sorted(bids, key=lambda b: b.bid_value, reverse=True)
-
-        return AdServerEvent.win(request, bids[0]) if bids else AdServerEvent.no_win(request)
 
     def process_wins(self) -> Dict[int, List[AdServerEvent]]:
         """Groups win events by campaign and clears the local state."""
