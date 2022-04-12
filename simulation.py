@@ -1,72 +1,62 @@
-from collections import defaultdict
-from dataclasses import dataclass
-from typing import Any, List, Generator, KT, VT
+from typing import Iterable
 
-Tick = int
-Kind = str
+import numpy as np
 
 
-class Clock:
-    def __init__(self, ticks: int):
-        self.ticks = ticks
-        self._now = 0
+class Request:
+    __slots__ = ["request", "window", "request_in_window"]
 
-    def start(self) -> Generator[Tick, None, None]:
-        for t in range(self.ticks):
-            self._now = t
-            yield t
-
-    @property
-    def now(self) -> Tick:
-        return self._now
+    def __init__(self, request: int, window: int, request_in_window: int):
+        self.request = request
+        self.window = window
+        self.request_in_window = request_in_window
 
 
-@dataclass
 class Event:
-    tick: Tick
-    kind: Kind
-    data: Any
+    __slots__ = ["request", "window", "request_in_window"]
 
+    def __init__(self, request: Request):
+        self.request = request.request
+        self.window = request.window
+        self.request_in_window = request.request_in_window
 
-class EventCollector:
-    def __init__(self):
-        self._queues = defaultdict(list)
+    def to_dict(self):
+        return dict((s, self.__getattribute__(s)) for s in self.__slots__)
 
-    def publish(self, ev: Event):
-        self._queues[ev.kind].append(ev)
-
-    def fetch(self, kind: int) -> List[Event]:
-        return self._queues[kind]
-
-
-class Context:
-    def __init__(self, base: 'Context' = None, **kwargs):
-        self._base = base
-        self._data = kwargs
-
-    def get(self, key: KT, default: VT = None) -> VT:
-        if key in self._data:
-            return self._data[key]
-
-        return self._base.get(key, default) if self._base else default
-
-    def __getitem__(self, key: KT):
-        return self.get(key)
+    def __repr__(self):
+        return str(self.to_dict())
 
 
 class Process:
-    def run(self, ctx: Context): pass
+    """Process handles a single request.
+
+    It's run with the number of the current window,
+     and the number of the request within that window.
+
+    It's notified on the end of a time window with the window's number.
+    """
+
+    def run(self, request: Request) -> Iterable: pass
+
+    def notify_window_end(self, window: int) -> None: pass
 
 
 class Simulation:
-    def __init__(self, clock: Clock):
-        self.clock = clock
-        self.processes: List[Process] = []
+    """Runs traffic simulation based on provided traffic distribution.
 
-    def register_process(self, p: Process):
-        self.processes.append(p)
+    The traffic distribution is represented as 1-D array, each value represents number of requests within a time window.
+
+    It calls a process on each request.
+    """
+
+    def __init__(self, dist: np.ndarray, process: Process):
+        self.dist = dist
+        self.process = process
 
     def run(self):
-        for t in self.clock.start():
-            for p in self.processes:
-                p.run(Context(tick=t))
+        request = 0
+        for window, requests in enumerate(self.dist):
+            for request_in_window in range(requests):
+                yield from self.process.run(Request(request, window, request_in_window))
+                request += 1
+            self.process.notify_window_end(window)
