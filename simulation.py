@@ -1,17 +1,18 @@
-from dataclasses import dataclass
 from typing import Iterable
 
 import numpy as np
 
 
-@dataclass
 class Request:
-    request: int
-    window: int
-    request_in_window: int
+    __slots__ = ["request", "window", "request_in_window"]
+
+    def __init__(self, request: int, window: int, request_in_window: int):
+        self.request = request
+        self.window = window
+        self.request_in_window = request_in_window
 
 
-class Response:
+class Event:
     __slots__ = ["request", "window", "request_in_window"]
 
     def __init__(self, request: Request):
@@ -32,12 +33,10 @@ class Process:
     It's run with the number of the current window,
      and the number of the request within that window.
 
-    It's notified on the start and the end of a time window, with its number.
+    It's notified on the end of a time window with the window's number.
     """
 
     def run(self, request: Request) -> Iterable: pass
-
-    def notify_window_start(self, window: int) -> None: pass
 
     def notify_window_end(self, window: int) -> None: pass
 
