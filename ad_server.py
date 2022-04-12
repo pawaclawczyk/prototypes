@@ -115,6 +115,10 @@ class ThrottledPacing(AsapPacing):
     It introduces threshold value for the percentage of auctions where the bid is placed.
     Periodically the threshold value is updated (up or down) by the adjustment rate.
 
+    The implementation assumes identical forecast for each campaign.
+    The base forecast distribution is kept, and budget spending forecast is computed on-the-fly during bid placing.
+    The "fast finnish" forces algorithm to spend budgets more aggressively at the end of the day.
+    It is done by changing the forecast information such as there will be no more ad requests in that period.
     Consts
     ======
     PTR: float
@@ -125,10 +129,9 @@ class ThrottledPacing(AsapPacing):
     PTR = 0.1
     AR = 0.1
 
-    def __init__(self, forecast: np.ndarray):
-        # @todo: prepare the forecast: get normalized distribution (not the traffic distribution)
-        #        and multiply by the planned daily budget. Then convert to cumulative.
-        self.forecast = forecast.cumsum() / forecast.sum()
+    def __init__(self, base_distribution: np.ndarray, fast_finish: int = 0):
+        self.forecast = base_distribution.copy().cumsum()
+        self.forecast[len(self.forecast) - fast_finish:] = 1.0
 
     def init(self, campaign: Campaign):
         """Initializes budgets and PTR. Creates independent PRNG."""
