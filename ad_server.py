@@ -29,6 +29,9 @@ class Campaign:
     bid_value: int
     state: CampaignState = field(default_factory=CampaignState)
 
+    def to_dict(self):
+        return {"campaign_id": self.campaign_id, "planned_budget": self.planned_budget, "bid_value": self.bid_value}
+
 
 class AdServerEvent(Event):
     __slots__ = Event.__slots__ + ["kind", "campaign_id", "bid_value"]
