@@ -72,14 +72,21 @@ class AdServerEvent(Event):
         return e
 
 
-class AsapPacing:
+class Pacing:
+    def init(self, campaign: Campaign): pass
+
+    def bid(self, campaign: Campaign, request: Request) -> AdServerEvent: pass
+
+    def consolidate_budget(self, window: int, campaign: Campaign, wins: List[AdServerEvent]): pass
+
+
+class AsapPacing(Pacing):
     """ASAP is the most basic pacing technique.
 
     It always places a bid if there is available budget to spend.
     """
 
-    @staticmethod
-    def init(campaign: Campaign):
+    def init(self, campaign: Campaign):
         """Initialize campaign state with daily planned budget.
 
         The allocation is set to 0 as there should be no bids placed before the initialization.
@@ -87,8 +94,7 @@ class AsapPacing:
         campaign.state.budget = campaign.planned_budget
         campaign.state.alloc = 0
 
-    @staticmethod
-    def bid(campaign: Campaign, request: Request) -> AdServerEvent:
+    def bid(self, campaign: Campaign, request: Request) -> AdServerEvent:
         """Places a bid whenever the bid value is within the available budget.
 
         Once the bid is placed, its value is added to the allocated budget.
@@ -99,8 +105,7 @@ class AsapPacing:
         else:
             return AdServerEvent.no_bid(request, campaign.campaign_id)
 
-    @staticmethod
-    def consolidate_budget(window: int, campaign: Campaign, wins: List[AdServerEvent]):
+    def consolidate_budget(self, window: int, campaign: Campaign, wins: List[AdServerEvent]):
         """Consolidates the budget based on winning notifications.
 
         The winning bid values are subtracted from the budget. The allocation budget set back to 0 as it contains both:
@@ -197,7 +202,7 @@ class AdServer(Process):
     At the end of time window it consolidates the campaigns budgets.
     """
 
-    def __init__(self, pacing: AsapPacing, select_win: Callable[[Request, List[AdServerEvent]], AdServerEvent],
+    def __init__(self, pacing: Pacing, select_win: Callable[[Request, List[AdServerEvent]], AdServerEvent],
                  campaigns: List[Campaign]):
         self.pacing = pacing
         self.select_win = select_win
