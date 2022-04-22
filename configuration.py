@@ -1,7 +1,7 @@
 from pathlib import Path
 
 WINDOWS = 24 * 60
-AVG_REQUESTS_PER_WINDOW = 60 * 1_000
+AVG_REQUESTS_PER_WINDOW = 60 * 100
 NUMBER_OF_REQUESTS = WINDOWS * AVG_REQUESTS_PER_WINDOW
 
 NUMBER_OF_CAMPAIGNS_LOW = 10
@@ -28,13 +28,13 @@ SCENARIOS = [
     #     "number_of_campaigns": NUMBER_OF_CAMPAIGNS_LOW,
     #     "budget_to_requests_rate": BUDGET_TO_REQUESTS_RATE_EXACT,
     # },
-    # {
-    #     "name": "low_competition_under_delivery",
-    #     "output_dir": OUTPUT_DIR,
-    #     "number_of_requests": NUMBER_OF_REQUESTS,
-    #     "number_of_campaigns": NUMBER_OF_CAMPAIGNS_LOW,
-    #     "budget_to_requests_rate": BUDGET_TO_REQUESTS_RATE_ABOVE,
-    # },
+    {
+        "name": "low_competition_under_delivery",
+        "output_dir": OUTPUT_DIR,
+        "number_of_requests": NUMBER_OF_REQUESTS,
+        "number_of_campaigns": NUMBER_OF_CAMPAIGNS_LOW,
+        "budget_to_requests_rate": BUDGET_TO_REQUESTS_RATE_ABOVE,
+    },
     # {
     #     "name": "high_competition_over_delivery",
     #     "output_dir": OUTPUT_DIR,
@@ -49,11 +49,11 @@ SCENARIOS = [
     #     "number_of_campaigns": NUMBER_OF_CAMPAIGNS_HIGH,
     #     "budget_to_requests_rate": BUDGET_TO_REQUESTS_RATE_EXACT,
     # },
-    {
-        "name": "high_competition_under_delivery",
-        "output_dir": OUTPUT_DIR,
-        "number_of_requests": NUMBER_OF_REQUESTS,
-        "number_of_campaigns": NUMBER_OF_CAMPAIGNS_HIGH,
-        "budget_to_requests_rate": BUDGET_TO_REQUESTS_RATE_ABOVE,
-    },
+    # {
+    #     "name": "high_competition_under_delivery",
+    #     "output_dir": OUTPUT_DIR,
+    #     "number_of_requests": NUMBER_OF_REQUESTS,
+    #     "number_of_campaigns": NUMBER_OF_CAMPAIGNS_HIGH,
+    #     "budget_to_requests_rate": BUDGET_TO_REQUESTS_RATE_ABOVE,
+    # },
 ]

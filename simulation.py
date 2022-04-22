@@ -12,19 +12,21 @@ class Request:
         self.request_in_window = request_in_window
 
 
-class Event:
-    __slots__ = ["request", "window", "request_in_window"]
+# class Event:
+#     __slots__ = ["request", "window", "request_in_window"]
+#
+#     def __init__(self, request: Request):
+#         self.request = request.request
+#         self.window = request.window
+#         self.request_in_window = request.request_in_window
+#
+#     def to_dict(self):
+#         return dict((s, self.__getattribute__(s)) for s in self.__slots__)
+#
+#     def __repr__(self):
+#         return str(self.to_dict())
 
-    def __init__(self, request: Request):
-        self.request = request.request
-        self.window = request.window
-        self.request_in_window = request.request_in_window
-
-    def to_dict(self):
-        return dict((s, self.__getattribute__(s)) for s in self.__slots__)
-
-    def __repr__(self):
-        return str(self.to_dict())
+Event = dict
 
 
 class Process:

@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 from typing import Iterable, Optional
@@ -35,11 +36,11 @@ def save_campaigns(output_dir: Path, campaigns: list[Campaign]):
 
 
 def load_events(output_dir: Path, case_name: str, kinds: Optional[list[str]] = None) -> pd.DataFrame:
-    df = pd.read_parquet(output_dir / f"{case_name}.parquet")
+    df = pd.read_json(output_dir / f"{case_name}.jsonl", lines=True)
+    df.set_index("request")
     if kinds:
         df = df[df["kind"].isin(kinds)]
     return df
-
 
 
 def load_events_from_multiple_cases(output_dir: Path, cases: list[str], kinds: Optional[list[str]] = None) \
@@ -49,7 +50,7 @@ def load_events_from_multiple_cases(output_dir: Path, cases: list[str], kinds: O
 
 def save_events(output_dir: Path, case_name: str, events: Iterable[Event]):
     os.makedirs(output_dir, exist_ok=True)
-    path = output_dir / f"{case_name}.parquet"
-    df = pd.DataFrame(e.to_dict() for e in events)
-    df.index.name = "ord"
-    df.to_parquet(path)
+    jsonl_path = output_dir / f"{case_name}.jsonl"
+    with open(jsonl_path, "w") as fp:
+        for event in events:
+            fp.write(json.dumps(event) + "\n")

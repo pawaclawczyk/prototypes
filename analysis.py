@@ -59,7 +59,7 @@ def compare_fill_rate(events: dict[str, pd.DataFrame]):
     for name, df in events.items():
         data = df.groupby("window").agg(
             wins=("kind", lambda s: s[s == "win"].size),
-            count=("request", np.size)
+            count=("kind", np.size)
         )
         data["fill_rate"] = data["wins"] / data["count"]
 
