@@ -19,12 +19,12 @@ def normal_dist(n: int, loc: float = 0.0, scale: float = 1.0):
     return normalize(norm.pdf(points, loc=loc, scale=scale))
 
 
-def custom_dist(n: int):
+def custom_distribution(n: int):
     a = normal_dist(n, -1, 0.5) * 0.75
     b = normal_dist(n, 1.5, 0.5)
     return normalize(a + b)
 
 
-def traffic_dist(distribution: np.ndarray, requests: int) -> np.ndarray:
+def traffic_distribution(distribution: np.ndarray, requests: int) -> np.ndarray:
     """Converts discrete probability distribution to traffic distribution of given number of requests."""
     return (normalize(distribution) * requests).round().astype(int)

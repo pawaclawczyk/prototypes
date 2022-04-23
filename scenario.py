@@ -19,24 +19,26 @@ class Scenario:
         self.budget_to_requests_rate = budget_to_requests_rate
 
         self.make_base_distribution()
-        self.requests_distribution = distributions.traffic_dist(self.base_distribution, self.number_of_requests)
+        self.requests_distribution = distributions.traffic_distribution(self.base_distribution, self.number_of_requests)
 
-        self.make_campaigns()
+        self.campaigns = self.make_campaigns(number_of_campaigns, number_of_requests, budget_to_requests_rate)
         self.make_cases()
         self.select_win = ad_server.second_price_auction
 
+        load_save.save_campaigns(self.output_dir, self.campaigns)
+
     def make_base_distribution(self):
-        self.base_distribution = distributions.custom_dist(self.windows)
+        self.base_distribution = distributions.custom_distribution(self.windows)
         load_save.save_base_distribution(self.output_dir, self.base_distribution)
 
-    def make_campaigns(self):
-        self.campaigns = []
-        for campaign_id in range(1, self.number_of_campaigns + 1):
+    @staticmethod
+    def make_campaigns(n: int, total_requests: int, budget_to_requests_rate: float):
+        campaigns = []
+        for campaign_id in range(1, n + 1):
             bid_value = 1000 + campaign_id
-            planned_budget = math.ceil(
-                bid_value * self.number_of_requests * self.budget_to_requests_rate / self.number_of_campaigns)
-            self.campaigns.append(ad_server.Campaign(campaign_id, planned_budget, bid_value))
-        load_save.save_campaigns(self.output_dir, self.campaigns)
+            planned_budget = math.ceil(bid_value * total_requests * budget_to_requests_rate / n)
+            campaigns.append(ad_server.Campaign(campaign_id, planned_budget, bid_value))
+        return campaigns
 
     def make_cases(self):
         self.cases = dict()
