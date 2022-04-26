@@ -1,10 +1,10 @@
-import os
 from pathlib import Path
 from typing import List
 
 import nbconvert
 import numpy as np
 import papermill as pm
+import yaml
 from dagster import OpExecutionContext, op, config_mapping, job, In, Nothing
 
 import load_save
@@ -109,4 +109,6 @@ def run_scenario():
 
 
 if __name__ == "__main__":
-    pass
+    with open("config.yaml", "r") as fp:
+        config = yaml.safe_load(fp)
+    run_scenario.execute_in_process()

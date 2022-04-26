@@ -1,0 +1,7 @@
+name: under_delivery
+output_dir: data
+windows: 1440
+requests: 10000000
+campaigns: 100
+budget_to_requests_rate: 1.5
+fast_finnish: 120
