@@ -10,3 +10,6 @@ jupyterlab
 
 dagster
 dagit
+
+papermill
+nbconvert
