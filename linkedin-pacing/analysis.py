@@ -1,9 +1,14 @@
+import os
 from collections import defaultdict
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import papermill as pm
 import seaborn as sns
+from nbconvert import HTMLExporter
+
+from ad_server import KIND_WIN
 
 
 def compare_budget_spending(campaigns: pd.DataFrame, base_distribution: pd.DataFrame, events: dict[str, pd.DataFrame]):
@@ -36,7 +41,7 @@ def compare_lifespan(events: dict[str, pd.DataFrame]):
     current_ax = 0
 
     for name, df in events.items():
-        df = df[df["kind"] == "win"]
+        df = df[df["kind"] == KIND_WIN]
         windows = df.groupby(["campaign_id"]).agg(
             window_width=("window", lambda w: np.max(w) - np.min(w)),
             window_unique=("window", pd.Series.nunique)
@@ -58,7 +63,7 @@ def compare_fill_rate(events: dict[str, pd.DataFrame]):
 
     for name, df in events.items():
         data = df.groupby("window").agg(
-            wins=("kind", lambda s: s[s == "win"].size),
+            wins=("kind", lambda s: s[s == KIND_WIN].size),
             count=("kind", np.size)
         )
         data["fill_rate"] = data["wins"] / data["count"]
@@ -74,7 +79,7 @@ def compare_bid_value(events: dict[str, pd.DataFrame]):
     current_ax = 0
 
     for name, df in events.items():
-        df = df[df["kind"] == "win"]
+        df = df[df["kind"] == KIND_WIN]
         data = df.groupby("window").agg(
             wins=("kind", np.size),
             value=("bid_value", np.sum)
@@ -93,7 +98,7 @@ def compare_bid_value(events: dict[str, pd.DataFrame]):
 def summary_comparison(events: dict[str, pd.DataFrame], quantile: float = .9, normalize: bool = True) -> pd.DataFrame:
     res = defaultdict(dict)
     for name, df in events.items():
-        win = df[df["kind"] == "win"]
+        win = df[df["kind"] == KIND_WIN]
         res["window_width"][name] = (win.groupby("campaign_id")
             .aggregate({"window": lambda w: np.max(w) - np.min(w)})
             .quantile(quantile)[0])
@@ -110,3 +115,12 @@ def summary_comparison(events: dict[str, pd.DataFrame], quantile: float = .9, no
         df /= base
 
     return df
+
+
+def make_report(scenario: str, template: str, output_dir: str):
+    out_nb = os.path.join(output_dir, "analysis.ipynb")
+    out_html = os.path.join(output_dir, "analysis.html")
+    pm.execute_notebook(template, out_nb, {"scenario": scenario})
+    body, _ = HTMLExporter().from_filename(out_nb)
+    with open(out_html, "w") as fp:
+        fp.write(body)

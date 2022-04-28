@@ -1,70 +1,51 @@
 from pathlib import Path
 from typing import List
 
-import nbconvert
 import numpy as np
-import papermill as pm
 import yaml
 from dagster import OpExecutionContext, op, config_mapping, job, In, Nothing
 
-import load_save
-from ad_server import AdServer, ThrottledPacing, second_price_auction, Campaign, AsapPacing
-from distributions import custom_distribution, traffic_distribution
-from load_save import save_events
+from ad_server import Campaign
+from analysis import make_report
 from scenario import Scenario
-from simulation import Simulation
 
 
 @op(config_schema={"windows": int, "output_dir": str})
 def make_base_distribution(context: OpExecutionContext) -> np.ndarray:
-    dist = custom_distribution(context.op_config["windows"])
-    load_save.save_base_distribution(context.op_config["output_dir"], dist)
-    return dist
+    return Scenario.make_base_distribution(context.op_config["windows"], context.op_config["output_dir"])
 
 
 @op(config_schema={"requests": int})
-def make_requests_distribution(context: OpExecutionContext, base_dist: np.ndarray) -> np.ndarray:
-    return traffic_distribution(base_dist, context.op_config["requests"])
+def make_requests_distribution(context: OpExecutionContext, base: np.ndarray) -> np.ndarray:
+    return Scenario.make_requests_distribution(base, context.op_config["requests"])
 
 
 @op(config_schema={"campaigns": int, "requests": int, "budget_to_requests_rate": float, "output_dir": str})
 def make_campaigns(context: OpExecutionContext) -> List[Campaign]:
-    campaigns = Scenario.make_campaigns(
+    return Scenario.make_campaigns(
         context.op_config["campaigns"],
         context.op_config["requests"],
         context.op_config["budget_to_requests_rate"],
+        context.op_config["output_dir"],
     )
-    load_save.save_campaigns(context.op_config["output_dir"], campaigns)
-    return campaigns
 
 
 @op(config_schema={"name": str, "output_dir": str})
 def run_asap_case(context: OpExecutionContext, reqs_dist: np.ndarray, campaigns: List[Campaign]):
-    proc = AdServer(AsapPacing(), second_price_auction, campaigns)
-    sim = Simulation(reqs_dist, proc)
-    save_events(context.op_config["output_dir"], context.op_config["name"], sim.run())
+    Scenario.make_and_run_asap_case(context.op_config["name"], context.op_config["output_dir"], reqs_dist, campaigns)
 
 
 @op(config_schema={"name": str, "output_dir": str, "fast_finnish": int})
 def run_throttled_case(context: OpExecutionContext, base_dist: np.ndarray, reqs_dist: np.ndarray,
                        campaigns: List[Campaign]):
-    proc = AdServer(ThrottledPacing(base_dist, context.op_config["fast_finnish"]), second_price_auction, campaigns)
-    sim = Simulation(reqs_dist, proc)
-    save_events(context.op_config["output_dir"], context.op_config["name"], sim.run())
+    Scenario.make_and_run_throttled_case(context.op_config["name"], context.op_config["output_dir"],
+                                         context.op_config["fast_finnish"], base_dist, reqs_dist, campaigns)
 
 
 @op(config_schema={"scenario": str, "template": str, "output_dir": str},
     ins={"asap": In(Nothing), "throttled": In(Nothing)})
 def generate_report(context: OpExecutionContext):
-    path_nb = Path(context.op_config["output_dir"]) / "report.ipynb"
-    path_html = Path(context.op_config["output_dir"]) / "report.html"
-
-    pm.execute_notebook(context.op_config["template"], path_nb, {"simulation": context.op_config["scenario"]})
-
-    exporter = nbconvert.HTMLExporter()
-    body, _ = exporter.from_filename(path_nb)
-    with open(path_html, "w") as fp:
-        fp.write(body)
+    make_report(context.op_config["scenario"], context.op_config["template"], context.op_config["output_dir"])
 
 
 @config_mapping(config_schema={
@@ -93,7 +74,7 @@ def scenario_config(values: dict) -> dict:
             "fast_finnish": values["fast_finnish"]
         }},
         "generate_report": {"config": {
-            "scenario": values["name"], "template": "report.template.ipynb", "output_dir": output_dir
+            "scenario": values["name"], "template": "analysis.template.ipynb", "output_dir": output_dir
         }}
     }}
 

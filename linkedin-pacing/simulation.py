@@ -2,7 +2,7 @@ from typing import Iterable
 
 import numpy as np
 
-Event = dict
+Event = tuple
 
 
 class Request:

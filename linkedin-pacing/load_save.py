@@ -1,4 +1,4 @@
-import json
+import csv
 import os
 from pathlib import Path
 from typing import Iterable, Optional
@@ -6,7 +6,7 @@ from typing import Iterable, Optional
 import numpy as np
 import pandas as pd
 
-from ad_server import Campaign
+from ad_server import Campaign, EVENT_FIELD_NAMES
 from simulation import Event
 
 
@@ -41,7 +41,7 @@ def save_campaigns(output_dir: str, campaigns: list[Campaign]):
 
 def load_events(output_dir: str, case_name: str, kinds: Optional[list[str]] = None) -> pd.DataFrame:
     output_dir = Path(output_dir)
-    df = pd.read_json(output_dir / f"{case_name}.jsonl", lines=True)
+    df = pd.read_csv(output_dir / f"{case_name}.csv")
     df.set_index("request")
     if kinds:
         df = df[df["kind"].isin(kinds)]
@@ -56,7 +56,9 @@ def load_events_from_multiple_cases(output_dir: str, cases: list[str], kinds: Op
 def save_events(output_dir: str, case_name: str, events: Iterable[Event]):
     output_dir = Path(output_dir)
     os.makedirs(output_dir, exist_ok=True)
-    jsonl_path = output_dir / f"{case_name}.jsonl"
-    with open(jsonl_path, "w") as fp:
+    path = output_dir / f"{case_name}.csv"
+    with open(path, "w") as fp:
+        w = csv.writer(fp)
+        w.writerow(EVENT_FIELD_NAMES)
         for event in events:
-            fp.write(json.dumps(event) + "\n")
+            w.writerow(event)

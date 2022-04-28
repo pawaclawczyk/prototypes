@@ -7,6 +7,20 @@ import numpy as np
 
 from simulation import Process, Request, Event
 
+EVENT_FIELD_NAMES = ["kind", "request", "window", "request_in_window", "campaign_id", "bid_value"]
+
+EVENT_KIND = 0
+EVENT_REQUEST = 1
+EVENT_WINDOW = 2
+EVENT_REQUEST_IN_WINDOW = 3
+EVENT_CAMPAIGN_ID = 4
+EVENT_BID_VALUE = 5
+
+KIND_BID = 0
+KIND_NO_BID = 1
+KIND_WIN = 2
+KIND_NO_WIN = 3
+
 
 @dataclass
 class CampaignState:
@@ -36,27 +50,19 @@ class Campaign:
 class EventFactory:
     @staticmethod
     def bid(request: Request, campaign_id: int, bid_value: int):
-        return {"kind": "bid", "request": request.request, "window": request.window,
-                "request_in_window": request.request_in_window,
-                "campaign_id": campaign_id, "bid_value": bid_value}
+        return KIND_BID, request.request, request.window, request.request_in_window, campaign_id, bid_value
 
     @staticmethod
     def no_bid(request: Request, campaign_id: int):
-        return {"kind": "no bid", "request": request.request, "window": request.window,
-                "request_in_window": request.request_in_window,
-                "campaign_id": campaign_id, "bid_value": 0}
+        return KIND_NO_BID, request.request, request.window, request.request_in_window, campaign_id, 0
 
     @staticmethod
     def win(request: Request, campaign_id: int, bid_value: int):
-        return {"kind": "win", "request": request.request, "window": request.window,
-                "request_in_window": request.request_in_window,
-                "campaign_id": campaign_id, "bid_value": bid_value}
+        return KIND_WIN, request.request, request.window, request.request_in_window, campaign_id, bid_value
 
     @staticmethod
     def no_win(request: Request):
-        return {"kind": "no win", "request": request.request, "window": request.window,
-                "request_in_window": request.request_in_window,
-                "campaign_id": 0, "bid_value": 0}
+        return KIND_NO_WIN, request.request, request.window, request.request_in_window, 0, 0
 
 
 class Pacing:
@@ -100,7 +106,7 @@ class AsapPacing(Pacing):
         (and included into allocated budget) are completed (no delays).
         """
         for win in wins:
-            campaign.state.budget -= win["bid_value"]
+            campaign.state.budget -= win[EVENT_BID_VALUE]
         campaign.state.alloc = 0
 
 
@@ -163,22 +169,22 @@ class ThrottledPacing(AsapPacing):
 
 def first_price_auction(request: Request, bids: List[Event]) -> Event:
     """Select highest bid as the win."""
-    bids = [b for b in bids if b["kind"] == "bid"]
+    bids = [b for b in bids if b[EVENT_KIND] == KIND_BID]
     if not bids:
         return EventFactory.no_win(request)
     bid = sorted(bids, key=lambda b: b.bid_value, reverse=True)[0]
-    return EventFactory.win(request, bid["campaign_id"], bid["bid_value"])
+    return EventFactory.win(request, bid[EVENT_CAMPAIGN_ID], bid[EVENT_BID_VALUE])
 
 
 def second_price_auction(request: Request, bids: List[Event]) -> Event:
     """Select highest bid as the win, but use the bid value from the second one."""
-    bids = [b for b in bids if b["kind"] == "bid"]
+    bids = [b for b in bids if b[EVENT_KIND] == KIND_BID]
     if not bids:
         return EventFactory.no_win(request)
-    bids = sorted(bids, key=lambda b: b["bid_value"], reverse=True)
+    bids = sorted(bids, key=lambda b: b[EVENT_BID_VALUE], reverse=True)
     if len(bids) == 1:
-        return EventFactory.win(request, bids[0]["campaign_id"], bids[0]["bid_value"])
-    return EventFactory.win(request, bids[0]["campaign_id"], bids[1]["bid_value"])
+        return EventFactory.win(request, bids[0][EVENT_CAMPAIGN_ID], bids[0][EVENT_BID_VALUE])
+    return EventFactory.win(request, bids[0][EVENT_CAMPAIGN_ID], bids[1][EVENT_BID_VALUE])
 
 
 class AdServer(Process):
@@ -220,9 +226,9 @@ class AdServer(Process):
         """Groups win events by campaign and clears the local state."""
         wins_by_camp = defaultdict(list)
         for win in self.wins:
-            if win["kind"] != "win":
+            if win[EVENT_KIND] != KIND_WIN:
                 continue
-            wins_by_camp[win["campaign_id"]].append(win)
+            wins_by_camp[win[EVENT_CAMPAIGN_ID]].append(win)
         self.wins = []
         return wins_by_camp
 
