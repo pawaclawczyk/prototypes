@@ -1,0 +1,33 @@
+#make_custom_distribution: ~
+#make_uniform_distribution: ~
+#make_requests_distribution:
+#  deps: [ make_custom_distribution ]
+#make_campaigns: ~
+#run_asap_case:
+#  name: asap
+#  deps: [ make_requests_distribution, make_campaigns ]
+#run_throttled_case:
+#  name: throttled
+#  op: run_throttled_case
+#  deps: [ make_requests_distribution, make_campaigns, make_custom_distribution ]
+#run_throttled_case_uniform_forecast:
+#  name: throttled_uniform_forecast
+#  op: run_throttled_case
+#  deps: [ make_requests_distribution, make_campaigns, make_uniform_distribution ]
+#make_analysis:
+#  deps: [ run_asap_case,run_throttled_case,run_throttled_case_uniform_forecast ]
+
+
+
+cases:
+  - name: asap
+    op: run_asap_case
+    extra_deps: {}
+  - name: throttled
+    op: run_throttled_case
+    extra_deps:
+      base_dist: make_custom_distribution
+  - name: throttled_no_forecast
+    op: run_throttled_case
+    extra_deps:
+      base_dist: make_uniform_distribution
