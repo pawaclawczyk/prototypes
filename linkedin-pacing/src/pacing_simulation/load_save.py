@@ -6,8 +6,8 @@ from typing import Iterable, Optional
 import numpy as np
 import pandas as pd
 
-from ad_server import Campaign, EVENT_FIELD_NAMES
-from simulation import Event
+from src.pacing_simulation.ad_server.ad_server import Campaign, EVENT_FIELD_NAMES
+from src.pacing_simulation.ad_server.simulation import Event
 
 
 def load_base_distribution(output_dir: str) -> pd.Series:

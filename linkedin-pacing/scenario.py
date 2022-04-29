@@ -3,10 +3,9 @@ import os.path
 
 import numpy as np
 
-import distributions
-import load_save
-from ad_server import AsapPacing, Campaign, AdServer, second_price_auction, ThrottledPacing
-from simulation import Simulation
+from pacing_simulation import distributions, load_save
+from src.pacing_simulation.ad_server.ad_server import AsapPacing, Campaign, AdServer, second_price_auction, ThrottledPacing
+from src.pacing_simulation.ad_server.simulation import Simulation
 
 
 class Scenario:

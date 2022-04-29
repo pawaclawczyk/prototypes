@@ -5,7 +5,7 @@ from typing import List, Iterable, Dict, Callable
 
 import numpy as np
 
-from simulation import Process, Request, Event
+from src.pacing_simulation.ad_server.simulation import Process, Request, Event
 
 EVENT_FIELD_NAMES = ["kind", "request", "window", "request_in_window", "campaign_id", "bid_value"]
 
@@ -74,7 +74,7 @@ class Pacing:
 
 
 class AsapPacing(Pacing):
-    """ASAP is the most basic pacing technique.
+    """ASAP is the most basic pacing_simulation technique.
 
     It always places a bid if there is available budget to spend.
     """
@@ -111,7 +111,7 @@ class AsapPacing(Pacing):
 
 
 class ThrottledPacing(AsapPacing):
-    """Throttled pacing technique - presented in the LinkedIn's article.
+    """Throttled pacing_simulation technique - presented in the LinkedIn's article.
 
     It introduces threshold value for the percentage of auctions where the bid is placed.
     Periodically the threshold value is updated (up or down) by the adjustment rate.

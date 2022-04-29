@@ -8,7 +8,7 @@ import papermill as pm
 import seaborn as sns
 from nbconvert import HTMLExporter
 
-from ad_server import KIND_WIN
+from src.pacing_simulation.ad_server.ad_server import KIND_WIN
 
 
 def compare_budget_spending(campaigns: pd.DataFrame, base_distribution: pd.DataFrame, events: dict[str, pd.DataFrame]):
@@ -118,7 +118,7 @@ def summary_comparison(events: dict[str, pd.DataFrame], quantile: float = .9, no
 
 
 def make_report(scenario: str, template: str, output_dir: str):
-    out_nb = os.path.join(output_dir, "analysis.ipynb")
+    out_nb = os.path.join(output_dir, "../../notebooks/analysis.ipynb")
     out_html = os.path.join(output_dir, "analysis.html")
     pm.execute_notebook(template, out_nb, {"scenario": scenario})
     body, _ = HTMLExporter().from_filename(out_nb)

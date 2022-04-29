@@ -1,4 +1,10 @@
+# Auto-generated directories
 .ipynb_checkpoints/
-.venv/
 __pycache__/
+*.egg-info/
+build/
+dist/
+
+# Convention-based directories
+venv/
 data/

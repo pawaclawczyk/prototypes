@@ -6,7 +6,7 @@ from dagster import config_mapping, job, GraphDefinition, repository, NodeInvoca
     OpDefinition, MultiDependencyDefinition
 from dagster.core.definitions import NodeDefinition
 
-from workflow import ops
+from pacing_simulation.workflow import ops
 
 
 @config_mapping(config_schema={
@@ -25,9 +25,6 @@ from workflow import ops
     "cases": {
         "throttled": {
             "fast_finnish": int
-        },
-        "throttled_no_forecast": {
-            "fast_finnish": int
         }
     },
     "analysis": {
@@ -36,23 +33,46 @@ from workflow import ops
 })
 def scenario_config(values: dict) -> dict:
     name, windows, requests = values["scenario"].values()
-    camps, btr = values["campaigns"].values()
     output_dir = os.path.join(values["general"]["output_dir"], name)
+    camps, btr = values["campaigns"].values()
+    cases = values["cases"]
+    analysis = values["analysis"]
 
     return {"ops": {
-        "make_custom_distribution": {"config": {"windows": windows, "output_dir": output_dir}},
-        "make_uniform_distribution": {"config": {"windows": windows, "output_dir": output_dir}},
-        "make_requests_distribution": {"config": {"requests": requests}},
+        "make_custom_distribution": {"config": {
+            "windows": windows,
+            "output_dir": output_dir
+        }},
+        "make_uniform_distribution": {"config": {
+            "windows": windows
+        }},
+        "make_requests_distribution": {"config": {
+            "requests": requests
+        }},
         "make_campaigns": {"config": {
-            "campaigns": camps, "requests": requests, "budget_to_requests_rate": btr, "output_dir": output_dir
+            "campaigns": camps,
+            "requests": requests,
+            "budget_to_requests_rate": btr,
+            "output_dir": output_dir
         }},
-        "run_asap_case": {"config": {"name": "asap", "output_dir": output_dir}},
+        "run_asap_case": {"config": {
+            "name": "asap",
+            "output_dir": output_dir
+        }},
         "run_throttled_case": {"config": {
-            "name": "Throttled", "output_dir": output_dir,
-            "fast_finnish": values["fast_finnish"]
+            "name": "throttled",
+            "output_dir": output_dir,
+            "fast_finnish": cases["throttled"]["fast_finnish"]
         }},
-        "generate_report": {"config": {
-            "scenario": values["name"], "template": "analysis.template.ipynb", "output_dir": output_dir
+        "throttled_no_forecast": {"config": {
+            "name": "throttled_no_forecast",
+            "output_dir": output_dir,
+            "fast_finnish": cases["throttled"]["fast_finnish"]
+        }},
+        "make_analysis": {"config": {
+            "scenario": name,
+            "template": analysis["template"],
+            "output_dir": output_dir
         }}
     }}
 
@@ -66,8 +86,8 @@ def run_scenario():
 
     asap = ops.run_asap_case(reqs_dist, campaigns)
     throttled = ops.run_throttled_case(custom_dist, reqs_dist, campaigns)
-    throttled_wo_forecast = ops.run_throttled_case(uniform_dist, reqs_dist, campaigns)
-    ops.make_analysis(wait_for=[asap, throttled, throttled_wo_forecast])
+    throttled_no_forecast = ops.run_throttled_case.alias("throttled_no_forecast")(uniform_dist, reqs_dist, campaigns)
+    ops.make_analysis(wait_for=[asap, throttled, throttled_no_forecast])
 
 
 def build_graph(config_path: str, nodes: list[NodeDefinition]) -> GraphDefinition:
