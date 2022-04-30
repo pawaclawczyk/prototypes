@@ -1,0 +1,7 @@
+# Build directories
+*.egg-info/
+
+# Self-defined directories
+venv/
+~data/source/
+data/
