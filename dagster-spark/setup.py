@@ -4,7 +4,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="dagster-spark",
+    name="dagster-with-spark",
     version="1.0.0",
     author="Paweł Wacławczyk",
     author_email="p.a.waclawczyk@gmail.com",

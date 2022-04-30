@@ -1,0 +1,3 @@
+from workflows.real_time_advertiser_auction import real_time_advertiser_auction_repository
+
+all_repositories = [real_time_advertiser_auction_repository]
