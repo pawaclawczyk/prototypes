@@ -11,7 +11,7 @@ setuptools.setup(
     description="Dagster & Spark",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/pawaclawczyk/prototypes/tree/dagster-spark/dagster-spark",
+    url="https://github.com/pawaclawczyk/prototypes/tree/dagster-spark/dagster-with-spark",
     project_urls={
         "Bug Tracker": "https://github.com/pawaclawczyk/prototypes/issues",
     },
