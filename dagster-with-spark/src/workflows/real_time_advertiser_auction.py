@@ -1,28 +1,38 @@
 from dagster import JobDefinition, OpExecutionContext, repository, job, op
 from dagster_pyspark import pyspark_resource
 
-from pipelines.real_time_advertiser_auction import ingest, embedded_and_ingest
+from pipelines.real_time_advertiser_auction import ingest, embed_and_ingest
 
-_pyspark_resource = pyspark_resource.configured({
-    "spark_conf": {
-        "spark.app.name": "PySpark Resource"
+
+def configure_spark_session(values: dict):
+    return {
+        "spark_conf": {
+            "spark": {
+                "master": values["master"],
+                "app": {
+                    "name": values["app"]
+                }
+            }
+        }
     }
-})
+
+
+spark_standalone = pyspark_resource.configured(configure_spark_session, config_schema={"master": str, "app": str})
 
 
 @op
 def ingest_with_embedded_spark() -> None:
-    embedded_and_ingest()
+    embed_and_ingest()
 
 
-@op(required_resource_keys={"pyspark"})
-def ingest_with_pyspark_resource(context: OpExecutionContext) -> None:
-    ingest(context.resources.pyspark.spark_session)
+@op(required_resource_keys={"spark"})
+def ingest_with_spark_resource(context: OpExecutionContext) -> None:
+    ingest(context.resources.spark.spark_session)
 
 
-@job(resource_defs={"pyspark": pyspark_resource})
-def job_with_pyspark_resource() -> None:
-    ingest_with_pyspark_resource()
+@job(resource_defs={"spark": spark_standalone})
+def job_with_spark_resource() -> None:
+    ingest_with_spark_resource()
 
 
 @job
@@ -34,5 +44,5 @@ def job_with_embedded_spark() -> None:
 def real_time_advertiser_auction_repository() -> list[JobDefinition]:
     return [
         job_with_embedded_spark,
-        job_with_pyspark_resource
+        job_with_spark_resource
     ]

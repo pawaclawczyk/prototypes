@@ -1,5 +1,6 @@
 # Build directories
 *.egg-info/
+__pycache__/
 
 # Self-defined directories
 venv/
