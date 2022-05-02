@@ -1,4 +1,4 @@
-.PHONY: spark-start spark-stop spark-history-server-start spark-history-server-stop minio-init minio-start minio-stop
+.PHONY: spark-start spark-stop spark-history-server-start spark-history-server-stop minio-init minio-start minio-stop k3s-install k3s-config k3s-status k3s-uninstall
 
 DATA_DIR   ?= $(HOME)/data
 VAR_DIR    ?= $(HOME)/var
