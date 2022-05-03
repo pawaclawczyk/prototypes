@@ -1,7 +1,23 @@
-from dagster import JobDefinition, OpExecutionContext, repository, job, op, Permissive
+from dagster import JobDefinition, OpExecutionContext, repository, job, op, Permissive, IOManager, InputContext, \
+    OutputContext, io_manager, InitResourceContext, Out
 from dagster_pyspark import pyspark_resource
+from pyspark.sql import DataFrame, SparkSession
 
-from pipelines.real_time_advertiser_auction import ingest, embed_and_ingest
+from pipelines.real_time_advertiser_auction import ingest, embed_and_ingest, ingest_and_save
+
+
+class SparkParquetIOManager(IOManager):
+    def load_input(self, context: InputContext):
+        spark: SparkSession = context.resources.spark.spark_session
+        return spark.read.parquet(context.upstream_output.config["path"])
+
+    def handle_output(self, context: OutputContext, df: DataFrame):
+        df.write.parquet(path=context.config["path"], mode="overwrite", partitionBy=context.metadata["partition_by"])
+
+
+@io_manager(output_config_schema={"path": str}, required_resource_keys={"spark"})
+def spark_parquet_io_manager(init_context: InitResourceContext) -> IOManager:
+    return SparkParquetIOManager()
 
 
 def configure_spark_session(values: dict):
@@ -35,16 +51,19 @@ def ingest_with_embedded_spark(context: OpExecutionContext) -> None:
 
 @op(required_resource_keys={"spark"}, config_schema={"src": str, "dst": str})
 def ingest_with_spark_resource(context: OpExecutionContext) -> None:
-    ingest(
+    ingest_and_save(
         context.resources.spark.spark_session,
         context.op_config["src"],
         context.op_config["dst"],
     )
 
 
-@job(resource_defs={"spark": spark_standalone})
-def job_with_spark_resource() -> None:
-    ingest_with_spark_resource()
+@op(required_resource_keys={"spark"}, config_schema={"src": str}, out=Out(metadata={"partition_by": "date"}))
+def ingest_with_io_manager(context: OpExecutionContext) -> DataFrame:
+    return ingest(
+        context.resources.spark.spark_session,
+        context.op_config["src"],
+    )
 
 
 @job
@@ -52,9 +71,20 @@ def job_with_embedded_spark() -> None:
     ingest_with_embedded_spark()
 
 
+@job(resource_defs={"spark": spark_standalone})
+def job_with_spark_resource() -> None:
+    ingest_with_spark_resource()
+
+
+@job(resource_defs={"spark": spark_standalone, "io_manager": spark_parquet_io_manager})
+def job_with_io_manager() -> None:
+    ingest_with_io_manager()
+
+
 @repository
 def real_time_advertiser_auction_repository() -> list[JobDefinition]:
     return [
         job_with_embedded_spark,
-        job_with_spark_resource
+        job_with_spark_resource,
+        job_with_io_manager,
     ]
