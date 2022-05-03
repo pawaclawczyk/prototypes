@@ -15,5 +15,8 @@ def ingest_and_save(spark: SparkSession, src: str, dst: str) -> None:
 def ingest(spark: SparkSession, src: str) -> DataFrame:
     df = spark.read.csv(src, header=True, inferSchema=True,
                         timestampFormat="yyyy-MM-dd HH:mm:ss")
+    return fix_date(df)
 
+
+def fix_date(df: DataFrame) -> DataFrame:
     return df.withColumnRenamed("date", "timestamp").withColumn("date", to_date(col("timestamp"))).drop("timestamp")

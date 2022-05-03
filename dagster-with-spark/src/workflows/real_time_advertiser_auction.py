@@ -1,9 +1,16 @@
 from dagster import JobDefinition, OpExecutionContext, repository, job, op, Permissive, IOManager, InputContext, \
-    OutputContext, io_manager, InitResourceContext, Out
+    OutputContext, io_manager, InitResourceContext, Out, root_input_manager, In
 from dagster_pyspark import pyspark_resource
 from pyspark.sql import DataFrame, SparkSession
 
-from pipelines.real_time_advertiser_auction import ingest, embed_and_ingest, ingest_and_save
+from pipelines.real_time_advertiser_auction import ingest, embed_and_ingest, ingest_and_save, fix_date
+
+
+@root_input_manager(input_config_schema={"path": str}, required_resource_keys={"spark"})
+def spark_csv_input_manager(context: InputContext) -> DataFrame:
+    spark: SparkSession = context.resources.spark.spark_session
+    return spark.read.csv(path=context.config["path"], header=True, inferSchema=True,
+                          timestampFormat="yyyy-MM-dd HH:mm:ss")
 
 
 class SparkParquetIOManager(IOManager):
@@ -66,6 +73,12 @@ def ingest_with_io_manager(context: OpExecutionContext) -> DataFrame:
     )
 
 
+@op(ins={"df": In(root_manager_key="input_manager")}, out=Out(metadata={"partition_by": "date"}),
+    required_resource_keys={"spark"})
+def ingest_with_input_manager(df: DataFrame) -> DataFrame:
+    return fix_date(df)
+
+
 @job
 def job_with_embedded_spark() -> None:
     ingest_with_embedded_spark()
@@ -81,10 +94,17 @@ def job_with_io_manager() -> None:
     ingest_with_io_manager()
 
 
+@job(resource_defs={"spark": spark_standalone, "io_manager": spark_parquet_io_manager,
+                    "input_manager": spark_csv_input_manager})
+def job_with_input_manager() -> None:
+    ingest_with_input_manager()
+
+
 @repository
 def real_time_advertiser_auction_repository() -> list[JobDefinition]:
     return [
         job_with_embedded_spark,
         job_with_spark_resource,
         job_with_io_manager,
+        job_with_input_manager
     ]
