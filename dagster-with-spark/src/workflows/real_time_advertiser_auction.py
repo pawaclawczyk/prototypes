@@ -3,7 +3,8 @@ from dagster import JobDefinition, OpExecutionContext, repository, job, op, Perm
 from dagster_pyspark import pyspark_resource
 from pyspark.sql import DataFrame, SparkSession
 
-from pipelines.real_time_advertiser_auction import ingest, embed_and_ingest, ingest_and_save, fix_date
+from pipelines.real_time_advertiser_auction import ingest, embed_and_ingest, ingest_and_save, fix_date, \
+    clean_and_compute_metrics
 
 
 @root_input_manager(input_config_schema={"path": str}, required_resource_keys={"spark"})
@@ -79,6 +80,14 @@ def ingest_with_input_manager(df: DataFrame) -> DataFrame:
     return fix_date(df)
 
 
+@op(out={
+    "publisher_metrics": Out(metadata={"partition_by": "site_id"}),
+    "advertiser_metrics": Out(metadata={"partition_by": "advertiser_id"}),
+})
+def compute_metrics(df: DataFrame) -> tuple[DataFrame, DataFrame]:
+    return clean_and_compute_metrics(df)
+
+
 @job
 def job_with_embedded_spark() -> None:
     ingest_with_embedded_spark()
@@ -100,11 +109,19 @@ def job_with_input_manager() -> None:
     ingest_with_input_manager()
 
 
+@job(resource_defs={"spark": spark_standalone, "io_manager": spark_parquet_io_manager,
+                    "input_manager": spark_csv_input_manager})
+def multi_step_job() -> None:
+    df = ingest_with_input_manager()
+    compute_metrics(df)
+
+
 @repository
 def real_time_advertiser_auction_repository() -> list[JobDefinition]:
     return [
         job_with_embedded_spark,
         job_with_spark_resource,
         job_with_io_manager,
-        job_with_input_manager
+        job_with_input_manager,
+        multi_step_job
     ]

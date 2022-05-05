@@ -3,6 +3,7 @@
 __pycache__/
 
 # Self-defined directories
-venv/
+.venv/
 ~data/source/
 data/
+tmp*/

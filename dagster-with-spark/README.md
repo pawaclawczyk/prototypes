@@ -124,3 +124,28 @@ resources:
       master: "local"
       # master: "spark://127.0.0.1:7077"
 ```
+
+### `multi_step_job`
+
+```yaml
+# run configuration
+ops:
+  ingest_with_input_manager:
+    inputs:
+      df:
+        path: data/source/real_time_advertiser_auction.csv
+    outputs:
+      result:
+        path: data/ingested/real_time_advertiser_auction/
+  compute_metrics:
+    outputs:
+      advertiser_metrics:
+        path: data/summary/real_time_advertiser_auction/advertiser_metrics/
+      publisher_metrics:
+        path: data/summary/real_time_advertiser_auction/publisherr_metrics/
+resources:
+  spark:
+    config:
+      app: ingest_with_input_manager
+      master: spark://localhost:7077
+```

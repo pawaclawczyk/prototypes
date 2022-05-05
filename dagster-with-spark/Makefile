@@ -36,6 +36,7 @@ clean-data: ## remove created data sets
 dependencies-all: ## install and upgrade all dependencies
 	python -m pip install -U -r requirements/dev.txt
 	python -m pip install -U -r requirements/dagster.txt
+	python -m pip install -U -r requirements/jupyter.txt
 	python -m pip install -U -r requirements/spark.txt
 
 develop: dependencies-all ## install package in editable mode for development

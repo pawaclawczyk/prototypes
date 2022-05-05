@@ -1,0 +1,8 @@
+jupyterlab
+pandas
+numpy
+pyarrow
+# because of dagster and dagit
+nbconvert<6.0.0,>=5.4.0
+nbformat<=5.1.3
+Jinja2<3.0
