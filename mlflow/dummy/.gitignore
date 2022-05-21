@@ -1,0 +1,5 @@
+# IDE
+.idea/
+
+# Convention-based development and runtime directories
+var/

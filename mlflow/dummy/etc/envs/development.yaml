@@ -1,0 +1,4 @@
+dependencies:
+  - pip>=21.2.4
+  - pip:
+      - mlflow>=1.26.0
