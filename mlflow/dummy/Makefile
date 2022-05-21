@@ -1,4 +1,4 @@
-.PHONY: help var/envs/*/update clean all
+.PHONY: help var/envs/*/update clean envs update run ui
 .DEFAULT_GOAL := help
 
 define PRINT_HELP_PYSCRIPT
@@ -15,24 +15,40 @@ export PRINT_HELP_PYSCRIPT
 SHELL := bash
 
 PROJECT := dummy
-SRC_DIR = $(PROJECT)
+SRC_DIR  = $(PROJECT)
 
-RUNTIME_ENV ?= runtime
+RUNTIME_ENV     ?= runtime
+DEVELOPMENT_ENV ?= development
+
+CONDA  := $(shell which conda)
+IN_ENV  = source $(dir $(CONDA))../etc/profile.d/conda.sh \
+          && conda activate var/envs/$(RUNTIME_ENV) 1>&2 \
+          && conda activate var/envs/$(DEVELOPMENT_ENV) --stack 1>&2 \
+          &&
 
 help:
 	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
 
 var/envs/%: etc/envs/%.yaml ## create environment
 	@rm -fr $@
-	@conda env create --quiet --prefix $@ --file $?
+	@$(CONDA) env create --quiet --prefix $@ --file $?
 
 var/envs/%/update: etc/envs/%.yaml ## update environment
-	@conda env update --quiet --prefix $(@D) --file $^ --prune
+	@$(CONDA) env update --quiet --prefix $(@D) --file $^ --prune
 
 conda.yaml: var/envs/$(RUNTIME_ENV) ## create distribution environment configuration
-	@conda env export --quiet --prefix $? | sed 's/name: .*/name: ${PROJECT}/g' | sed '/^prefix/d' > $@
+	@$(CONDA) env export --quiet --prefix $? | sed 's/name: .*/name: ${PROJECT}/g' | sed '/prefix/d' > $@
 
 clean: ## remove all objects
+	@rm -fr mlruns/
 	@rm -fr var/
 
-all: clean conda.yaml ## run all targets in the distribution workflow
+envs: var/envs/$(RUNTIME_ENV) var/envs/$(DEVELOPMENT_ENV) ## create environments
+
+update: var/envs/$(RUNTIME_ENV)/update var/envs/$(DEVELOPMENT_ENV)/update ## update environments
+
+run: envs conda.yaml ## run MLFlow project
+	$(IN_ENV) mlflow run $(PWD)
+
+ui: envs ## run MLFlow UI
+	@$(IN_ENV) mlflow ui

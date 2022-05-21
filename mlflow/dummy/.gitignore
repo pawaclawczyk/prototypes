@@ -1,5 +1,8 @@
 # IDE
 .idea/
 
-# Convention-based development and runtime directories
+# Project's development and runtime directories
 var/
+
+# MLFlow runtime directories
+mlruns/

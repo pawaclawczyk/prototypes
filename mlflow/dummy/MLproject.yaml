@@ -1,5 +1,0 @@
-name: dummy
-conda_env: dist/envs/runtime.yaml
-entry_points:
-  main:
-    command: "python main.py"
