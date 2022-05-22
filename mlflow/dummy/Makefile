@@ -20,11 +20,13 @@ SRC_DIR  = $(PROJECT)
 RUNTIME_ENV     ?= runtime
 DEVELOPMENT_ENV ?= development
 
-CONDA  := $(shell which conda)
-IN_ENV  = source $(dir $(CONDA))../etc/profile.d/conda.sh \
-          && conda activate var/envs/$(RUNTIME_ENV) 1>&2 \
-          && conda activate var/envs/$(DEVELOPMENT_ENV) --stack 1>&2 \
-          &&
+CONDA      := $(shell which conda)
+CONDA_HOME := $(abspath $(dir $(CONDA))/../)
+RUNTIME     = source $(CONDA_HOME)/etc/profile.d/conda.sh \
+              && conda activate var/envs/$(RUNTIME_ENV) 1>&2 \
+              &&
+DEVELOPMENT = $(RUNTIME) conda activate var/envs/$(DEVELOPMENT_ENV) --stack 1>&2 \
+              &&
 
 help:
 	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
@@ -48,7 +50,7 @@ envs: var/envs/$(RUNTIME_ENV) var/envs/$(DEVELOPMENT_ENV) ## create environments
 update: var/envs/$(RUNTIME_ENV)/update var/envs/$(DEVELOPMENT_ENV)/update ## update environments
 
 run: envs conda.yaml ## run MLFlow project
-	$(IN_ENV) mlflow run $(PWD)
+	$(RUNTIME) mlflow run $(PWD)
 
 ui: envs ## run MLFlow UI
-	@$(IN_ENV) mlflow ui
+	$(RUNTIME) mlflow ui

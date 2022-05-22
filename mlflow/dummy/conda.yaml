@@ -19,7 +19,7 @@ dependencies:
   - numpy=1.22.3=py310he1f95b8_2
   - openssl=3.0.3=hfe4f2af_0
   - pandas=1.4.2=py310h514ec25_1
-  - pip=22.0.4=pyhd8ed1ab_0
+  - pip=22.1.1=pyhd8ed1ab_0
   - python=3.10.4=h1cc4136_0_cpython
   - python-dateutil=2.8.2=pyhd8ed1ab_0
   - python_abi=3.10=2_cp310
