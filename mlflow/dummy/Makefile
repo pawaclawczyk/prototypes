@@ -20,7 +20,11 @@ SRC_DIR  = $(PROJECT)
 RUNTIME_ENV     ?= runtime
 DEVELOPMENT_ENV ?= development
 
-CONDA      := $(shell which conda)
+CONDA     := $(shell which conda)
+ifeq ($(findstring '.asdf/shims/conda', $(CONDA)),)
+	CONDA := $(shell asdf which conda)
+endif
+
 CONDA_HOME := $(abspath $(dir $(CONDA))/../)
 RUNTIME     = source $(CONDA_HOME)/etc/profile.d/conda.sh \
               && conda activate var/envs/$(RUNTIME_ENV) 1>&2 \
