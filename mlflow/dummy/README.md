@@ -16,25 +16,25 @@
 An environment configuration must be placed in the `etc/envs/<environment>.yaml` file. 
 
 ```shell
-make var/envs/<environment>
-conda activate var/envs/<environment> [--stack]
+make var/env/<environment>
+conda activate var/env/<environment> [--stack]
 ```
 
 Use `--stack` to activate one environment on top of the currently active one.
 It is useful to add testing or development dependencies on top of the runtime dependencies.
 
 ```shell
-make var/envs/runtime
-make var/envs/development
+make var/env/runtime
+make var/env/development
 
-conda activate var/envs/runtime 
-conda activate var/envs/development --stack
+conda activate var/env/runtime 
+conda activate var/env/development --stack
 ```
 
 Update a specific environment.
 
 ```shell
-make var/envs/<environment>/update
+make var/env/<environment>/update
 ```
 
 ## Distribute project
@@ -43,5 +43,5 @@ Create distribution environment configuration file.
 
 
 ```shell
-make dist/envs/<environment>.yaml
+make dist/env/<environment>.yaml
 ```

@@ -1,4 +1,4 @@
-.PHONY: help var/envs/*/update clean envs update run ui
+.PHONY: help .env/* mlflow/* test clean
 .DEFAULT_GOAL := help
 
 define PRINT_HELP_PYSCRIPT
@@ -15,46 +15,41 @@ export PRINT_HELP_PYSCRIPT
 SHELL := bash
 
 PROJECT := dummy
-SRC_DIR  = $(PROJECT)
+SRC_DIR := $(PROJECT)
 
-RUNTIME_ENV     ?= runtime
-DEVELOPMENT_ENV ?= development
-
-CONDA     := $(shell which conda)
-ifeq ($(findstring '.asdf/shims/conda', $(CONDA)),)
-	CONDA := $(shell asdf which conda)
+__conda_bin := $(shell which conda)
+ifeq ($(findstring '.asdf/shims/conda', $(__conda_bin)),)
+	__conda_bin := $(shell asdf which conda)
 endif
-
-CONDA_HOME := $(abspath $(dir $(CONDA))/../)
-RUNTIME     = source $(CONDA_HOME)/etc/profile.d/conda.sh \
-              && conda activate var/envs/$(RUNTIME_ENV) 1>&2 \
-              &&
-DEVELOPMENT = $(RUNTIME) conda activate var/envs/$(DEVELOPMENT_ENV) --stack 1>&2 \
-              &&
+__conda_home   = $(abspath $(dir $(__conda_bin))/../)
+__source_conda = source $(__conda_home)/etc/profile.d/conda.sh &&
+__conda_env    = $(__source_conda) conda activate .venv/ &&
 
 help:
 	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
 
-var/envs/%: etc/envs/%.yaml ## create environment
-	@rm -fr $@
-	@$(CONDA) env create --quiet --prefix $@ --file $?
+.venv: etc/conda.yaml etc/requirements.txt ## install dependencies
+	conda env create --force --file $(word 1,$^) --prefix $@
+	touch $@
 
-var/envs/%/update: etc/envs/%.yaml ## update environment
-	@$(CONDA) env update --quiet --prefix $(@D) --file $^ --prune
+.venv/dev: .venv etc/requirements.dev.txt ## install development dependencies
+	$(__conda_env) python -m pip install -U -r $(word 2,$^)
+	touch $(word 1,$^)
 
-conda.yaml: var/envs/$(RUNTIME_ENV) ## create distribution environment configuration
-	@$(CONDA) env export --quiet --prefix $? | sed 's/name: .*/name: ${PROJECT}/g' | sed '/prefix/d' > $@
+conda.yaml: .venv etc/conda.yaml etc/requirements.txt ## dump conda.yaml environment configuration file
+	#conda env create --force --file $(word 2,$^) --prefix $(word 1,$^)
+	$(__conda_env) python -m pip uninstall --yes -r etc/requirements.dev.txt
+	conda env export --prefix $(word 1,$^) | yq '.name|="$(PROJECT)"' | yq 'del(.prefix)' > $@
 
-clean: ## remove all objects
-	@rm -fr mlruns/
-	@rm -fr var/
+mlflow/run: conda.yaml ## run MLFlow project
+	$(__conda_env) mlflow run .
 
-envs: var/envs/$(RUNTIME_ENV) var/envs/$(DEVELOPMENT_ENV) ## create environments
+mlflow/ui: .venv/dev ## run MLFlow UI
+	$(__conda_env) mlflow ui
 
-update: var/envs/$(RUNTIME_ENV)/update var/envs/$(DEVELOPMENT_ENV)/update ## update environments
+test: .venv/dev ## run all tests
+	$(__conda_env) python -m pytest -v $(SRC_DIR)
 
-run: envs conda.yaml ## run MLFlow project
-	$(RUNTIME) mlflow run $(PWD)
-
-ui: envs ## run MLFlow UI
-	$(RUNTIME) mlflow ui
+clean: ## remove all artifacts
+	rm -fr .venv/
+	rm -fr mlruns/

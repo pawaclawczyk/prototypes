@@ -1,0 +1,6 @@
+channels:
+  - conda-forge
+dependencies:
+  - pip>=22.0.4
+  - pip:
+      - -r requirements.test.txt
