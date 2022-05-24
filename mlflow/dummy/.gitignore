@@ -2,9 +2,9 @@
 .idea/
 
 # Project's development and runtime directories
-.env/
-.venv
 var/
 
-# MLFlow runtime directories
+# Runtime artifacts
+.pytest_cache/
+__pycache__/
 mlruns/
