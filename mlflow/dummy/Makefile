@@ -33,11 +33,13 @@ __conda_env    = $(__source_conda) conda activate $(PROD_ENV_PREFIX)/ &&
 help:
 	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
 
-conda.yaml: etc/conda.yaml etc/requirements.txt ## dump conda.yaml
+$(BUILD_ENV_PREFIX): etc/conda.yaml etc/requirements.txt
 	conda env create --force --prefix $(BUILD_ENV_PREFIX) --file $(firstword $^)
+
+conda.yaml: $(BUILD_ENV_PREFIX) ## dump conda.yaml
 	conda env export --prefix $(BUILD_ENV_PREFIX) | yq '.name|="$(PROJECT)"' | yq 'del(.prefix)' > $@
 
-conda.yaml/update: conda.yaml ## update dependencies and dump conda.yaml
+conda.yaml/update: $(BUILD_ENV_PREFIX) ## update dependencies and dump conda.yaml
 	conda update $(foreach ch,$(shell yq '.channels[]' conda.yaml),--channel $(ch)) --override-channels --update-all --yes --prefix $(BUILD_ENV_PREFIX)
 	conda env export --prefix $(BUILD_ENV_PREFIX) | yq '.name|="$(PROJECT)"' | yq 'del(.channels[] | select(. == "defaults"))' | yq 'del(.prefix)' > $(@D)
 

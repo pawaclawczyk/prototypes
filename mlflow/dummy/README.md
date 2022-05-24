@@ -21,6 +21,17 @@
 |-- Makefile                     ## automated codebase operations
 ```
 
+## System dependencies
+
+The project requires following utilities:
+
+- make (used version: GNU Make 4.3)
+- yq (used version: 4.25.1)
+- conda (used version: 4.12.0)
+
+All the dependencies can be installed using [asdf](https://asdf-vm.com/) tool: `asdf install`.
+The tools and versions are defined in the `.tool-versions` file.
+
 ## Working with the environments
 
 ```shell

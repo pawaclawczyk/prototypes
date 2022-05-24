@@ -1,1 +1,3 @@
 python miniconda3-latest
+yq 4.25.1
+make 4.3
