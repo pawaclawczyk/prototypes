@@ -1,0 +1,10 @@
+# IDE
+.idea/
+
+# Project's development and runtime directories
+var/
+
+# Runtime artifacts
+.pytest_cache/
+__pycache__/
+mlruns/
