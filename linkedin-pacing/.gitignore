@@ -1,10 +1,10 @@
-# Auto-generated directories
+## Runtime and temporary data
+var/
+tmp/
+
+# Python
 .ipynb_checkpoints/
 __pycache__/
 *.egg-info/
 build/
 dist/
-
-# Convention-based directories
-venv/
-data/

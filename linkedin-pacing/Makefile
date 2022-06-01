@@ -1,4 +1,4 @@
-.PHONY: clean clean-build clean-pyc dist help
+.PHONY: clean clean-build clean-pyc develop help
 .DEFAULT_GOAL := help
 
 define PRINT_HELP_PYSCRIPT
@@ -12,36 +12,83 @@ for line in sys.stdin:
 endef
 export PRINT_HELP_PYSCRIPT
 
-help:
+# User settings
+
+## Python binary
+PYTHON ?= python
+
+## Directory where the Python virtual environments will be located
+ENVS_DIR ?= var/envs
+
+## Actual environment name to use; default: dev
+ENV ?= dev
+
+## Dagster environments
+DAGSTER_HOME = var/dagster
+
+# Project settings
+
+## Python environments
+ENV_PROD_DEPS = requirements.txt setup.py setup.cfg
+ENV_DEV_DEPS  = $(ENV_PROD_DEPS) requirements.dev.txt
+
+## Dagster
+DAGSTER_REPOSITORIES = src/pacing_simulation/workflow/repository.py
+DAGSTER_ENVS         = DAGSTER_HOME=$(abspath $(DAGSTER_HOME))
+
+# Helpers
+
+## Environment activation prefix
+__env = source $(ENVS_DIR)/$(ENV)/bin/activate &&
+
+# Main targets
+
+help: ## print this help
 	@python -c "$$PRINT_HELP_PYSCRIPT" < $(MAKEFILE_LIST)
 
-clean: clean-build clean-pyc ## remove all build, test, coverage and Python artifacts
+develop: $(ENVS_DIR)/dev ## set up development environment
 
-clean-build: ## remove build artifacts
+dagit: $(ENVS_DIR)/$(ENV) $(DAGSTER_HOME) ## run Dagit
+	$(__env) $(DAGSTER_ENVS) $(PYTHON) -m dagit -f $(DAGSTER_REPOSITORIES)
+
+clean: clean/build clean/pyc clean/runtime ## remove all build, test, coverage and Python artifacts
+
+# Helper targets
+
+$(ENVS_DIR):
+	@mkdir -p $@
+
+$(ENVS_DIR)/prod: $(ENVS_DIR) $(ENV_PROD_DEPS)
+	@$(PYTHON) -m venv $@
+	$(__env) $(PYTHON) -m pip install --editable '.'
+	touch $@
+
+$(ENVS_DIR)/dev: $(ENVS_DIR) $(ENV_DEV_DEPS)
+	@$(PYTHON) -m venv $@
+	$(__env) $(PYTHON) -m pip install --editable '.[dev]'
+	touch $@
+
+$(ENVS_DIR)/%: $(ENVS_DIR)
+	@$(PYTHON) -m venv $@
+
+$(DAGSTER_HOME): dagster.yaml
+	mkdir -p $@
+	cp $^ $@
+	touch $@
+
+clean/build:
 	rm -fr build/
 	rm -fr dist/
 	rm -fr .eggs/
 	find . -name '*.egg-info' -exec rm -fr {} +
 	find . -name '*.egg' -exec rm -f {} +
 
-clean-pyc: ## remove Python file artifacts
+clean/pyc:
 	find . -name '*.pyc' -exec rm -f {} +
 	find . -name '*.pyo' -exec rm -f {} +
 	find . -name '*~' -exec rm -f {} +
 	find . -name '__pycache__' -exec rm -fr {} +
 
-dist: clean ## builds source and wheel package
-	python setup.py sdist
-	python setup.py bdist_wheel
-	ls -l dist
-
-develop: ## Install and upgrade all dependencies and the package
-	python -m pip install -U -r requirements_dev.txt
-	python -m pip install -U -r requirements.txt
-	python -m pip install -e .
-
-install-dagster-dependency: ## Installs dependencies for running Dagster jobs
-	python -m pip install -r requirements.txt
-
-dagit: install-dagster-dependency ## Starts local Dagit instance
-	python -m dagit -f src/pacing_simulation/workflow/repository.py
+clean/runtime:
+	rm -fr var/
+	rm -fr tmp/

@@ -3,6 +3,12 @@ import setuptools
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
+
+def read_requirements(path: str = "requirements.txt") -> list[str]:
+    with open(path, "r") as fp:
+        return fp.readlines()
+
+
 setuptools.setup(
     name="simulation-pacing_simulation",
     version="0.1.0",
@@ -22,5 +28,9 @@ setuptools.setup(
     ],
     package_dir={"": "src"},
     packages=setuptools.find_packages(where="src"),
+    install_requires=read_requirements(),
+    extras_require={
+        "dev": read_requirements("requirements.dev.txt")
+    },
     python_requires=">=3.10",
 )
