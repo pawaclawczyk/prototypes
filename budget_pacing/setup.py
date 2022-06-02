@@ -10,11 +10,11 @@ def read_requirements(path: str = "requirements.txt") -> list[str]:
 
 
 setuptools.setup(
-    name="simulation-pacing_simulation",
-    version="0.1.0",
+    name="budget_pacing",
+    version="0.1.0+dev",
     author="Paweł Wacławczyk",
     author_email="p.a.waclawczyk@gmail.com",
-    description="Simulation of ad server workload with LinkedIn pacing_simulation algorithm",
+    description="Simulation comapring various budget pacing algorithms",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/pawaclawczyk/simulation-pacing",

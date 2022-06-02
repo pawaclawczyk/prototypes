@@ -1,11 +1,64 @@
-import numpy as np
-from dagster import op, OpExecutionContext, List, In, Nothing
+import math
 
-from src.pacing_simulation.ad_server.ad_server import Campaign
-from src.pacing_simulation.analysis import make_report
-from pacing_simulation.distributions import custom_distribution
+import numpy as np
+from dagster import op, OpExecutionContext, List, In, Nothing, job, repository, Out, Output
+
+from pacing_simulation.ad_server.simulation import Simulation, Event
+from pacing_simulation.distributions import custom_distribution, traffic_distribution
 from pacing_simulation.load_save import save_base_distribution
 from scenario import Scenario
+from src.pacing_simulation.ad_server.ad_server import Campaign, AsapPacing, AdServer, second_price_auction
+from src.pacing_simulation.analysis import make_report
+
+WINDOWS = (24 * 60)
+BID_VALUE_OFFSET = 1_000
+
+
+@op(
+    config_schema={
+        "num_of_camps": int,
+        "num_of_imps": int,
+        "delivery": float,
+    },
+    out={
+        "camps": Out(),
+        "traffic": Out(),
+    }
+)
+def prepare_input_data(context: OpExecutionContext):
+    num_of_camps = context.op_config["num_of_camps"]
+    num_of_imps = context.op_config["num_of_imps"]
+    delivery = context.op_config["delivery"]
+
+    camps = []
+    for i in range(1, num_of_camps + 1):
+        bv = (BID_VALUE_OFFSET + i)
+        camps.append(Campaign(i, num_of_imps * bv, bv))
+
+    reqs = math.ceil(num_of_camps * num_of_imps * delivery)
+
+    dist = custom_distribution(WINDOWS)
+    traffic = traffic_distribution(dist, reqs)
+
+    return Output(camps, "camps"), Output(traffic, "traffic")
+
+
+def run_asap_case(camps: list[Campaign], traffic: np.ndarray) -> list[Event]:
+    pacing = AsapPacing()
+    process = AdServer(pacing, second_price_auction, camps)
+    sim = Simulation(traffic, process)
+    return list(sim.run())
+
+
+@job
+def run_all():
+    camps, traffic = prepare_input_data()
+    run_asap_case(camps, traffic)
+
+
+@repository
+def simulations():
+    return [run_all]
 
 
 @op(config_schema={"windows": int, "output_dir": str})
@@ -37,7 +90,8 @@ def make_campaigns(context: OpExecutionContext) -> List[Campaign]:
 
 @op(config_schema={"name": str, "output_dir": str})
 def run_asap_case(context: OpExecutionContext, reqs_dist: np.ndarray, campaigns: List[Campaign]):
-    Scenario.make_and_run_asap_case(context.op_config["name"], context.op_config["output_dir"], reqs_dist, campaigns)
+    Scenario.make_and_run_asap_case(context.op_config["name"], context.op_config["output_dir"], reqs_dist,
+                                    campaigns)
 
 
 @op(config_schema={"name": str, "output_dir": str, "fast_finnish": int})
