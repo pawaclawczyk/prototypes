@@ -11,7 +11,7 @@ Have fun!
 
 ## Map of content
 
-- [LinkedIn Pacing](linkedin-pacing) - Comparison of naive implmentations of classic ASAP and proposed by LinkedIn throttled pacing algorithms. For those not from the AdTech industry: a pacing algorithm defines how aggresively an advertising campaign is spending its budget in ad impression auctions.
+- [Budget Pacing](budget_pacing) - Comparison of naive implmentations of classic ASAP and proposed by LinkedIn throttled pacing algorithms. For those not from the AdTech industry: a pacing algorithm defines how aggresively an advertising campaign is spending its budget in ad impression auctions.
 
 - [Dagster with Apache Spark](dagster-with-spark) - Example project showcasing usage of Dagster (orchestrator) with Apache Spark (data processing). Apache Spark is one my favourite tools for data processing (Pandas is the other one), but I didn't have too much experience with tasks orchestrators. Apache Airflow didn't stole my heart and I was tempted with the typed input/output control offered by Dagster.
 
