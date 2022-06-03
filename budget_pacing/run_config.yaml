@@ -1,0 +1,6 @@
+ops:
+  prepare_input_data:
+    config:
+      num_of_camps: 10
+      num_of_imps: 1000
+      delivery: 1.0

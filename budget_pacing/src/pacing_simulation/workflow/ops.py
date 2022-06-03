@@ -43,6 +43,7 @@ def prepare_input_data(context: OpExecutionContext):
     return Output(camps, "camps"), Output(traffic, "traffic")
 
 
+@op
 def run_asap_case(camps: list[Campaign], traffic: np.ndarray) -> list[Event]:
     pacing = AsapPacing()
     process = AdServer(pacing, second_price_auction, camps)
@@ -104,3 +105,7 @@ def run_throttled_case(context: OpExecutionContext, base_dist: np.ndarray, reqs_
 @op(config_schema={"scenario": str, "template": str, "output_dir": str}, ins={"wait_for": In(Nothing)})
 def make_analysis(context: OpExecutionContext):
     make_report(context.op_config["scenario"], context.op_config["template"], context.op_config["output_dir"])
+
+
+if __name__ == "__main__":
+    run_all.execute_in_process()
