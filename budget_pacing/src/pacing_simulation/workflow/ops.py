@@ -1,14 +1,38 @@
 import math
+import os.path
 
 import numpy as np
-from dagster import op, OpExecutionContext, List, In, Nothing, job, repository, Out, Output
+import pandas as pd
+from dagster import op, OpExecutionContext, List, In, Nothing, job, repository, Out, Output, IOManager, InputContext, \
+    OutputContext, io_manager, InitResourceContext
 
-from pacing_simulation.ad_server.simulation import Simulation, Event
-from pacing_simulation.distributions import custom_distribution, traffic_distribution
+from pacing_simulation.ad_server.simulation import Simulation
+from pacing_simulation.distributions import custom_distribution, traffic_distribution, uniform_distribution
 from pacing_simulation.load_save import save_base_distribution
 from scenario import Scenario
-from src.pacing_simulation.ad_server.ad_server import Campaign, AsapPacing, AdServer, second_price_auction
-from src.pacing_simulation.analysis import make_report
+from src.pacing_simulation.ad_server.ad_server import Campaign, AsapPacing, AdServer, second_price_auction, \
+    ThrottledPacing
+from src.pacing_simulation.analysis import make_report, aggregate_case_events
+
+
+class PandasCSVIOManager(IOManager):
+    def __init__(self, base_dir: str):
+        self.base_dir = base_dir
+        self.file_postfix = ".csv"
+
+    def handle_output(self, context: OutputContext, df: pd.DataFrame):
+        path = os.path.join(self.base_dir, context.metadata["path"] + self.file_postfix)
+        df.to_csv(path)
+
+    def load_input(self, context: InputContext) -> pd.DataFrame:
+        path = os.path.join(self.base_dir, context.upstream_output.metadata["path"] + self.file_postfix)
+        return pd.read_csv(path)
+
+
+@io_manager(config_schema={"base_dir": str})
+def pandas_csv_io_manager(init_context: InitResourceContext) -> IOManager:
+    return PandasCSVIOManager(init_context.resource_config["base_dir"])
+
 
 WINDOWS = (24 * 60)
 BID_VALUE_OFFSET = 1_000
@@ -22,6 +46,7 @@ BID_VALUE_OFFSET = 1_000
     },
     out={
         "camps": Out(),
+        "dist": Out(),
         "traffic": Out(),
     }
 )
@@ -40,21 +65,51 @@ def prepare_input_data(context: OpExecutionContext):
     dist = custom_distribution(WINDOWS)
     traffic = traffic_distribution(dist, reqs)
 
-    return Output(camps, "camps"), Output(traffic, "traffic")
+    return Output(camps, "camps"), dist, Output(traffic, "traffic")
 
 
-@op
-def run_asap_case(camps: list[Campaign], traffic: np.ndarray) -> list[Event]:
+@op(out=Out(io_manager_key="pandas_io_manager", metadata={"path": "asap"}))
+def run_asap_case(camps: list[Campaign], traffic: np.ndarray) -> pd.DataFrame:
     pacing = AsapPacing()
     process = AdServer(pacing, second_price_auction, camps)
     sim = Simulation(traffic, process)
-    return list(sim.run())
+    return aggregate_case_events(sim.run())
 
 
-@job
+@op(out=Out(io_manager_key="pandas_io_manager", metadata={"path": "throttled"}))
+def run_throttled_case(dist: np.ndarray, camps: list[Campaign], traffic: np.ndarray) -> pd.DataFrame:
+    pacing = ThrottledPacing(dist, (2 * 60))
+    process = AdServer(pacing, second_price_auction, camps)
+    sim = Simulation(traffic, process)
+    return aggregate_case_events(sim.run())
+
+
+@op(out=Out(io_manager_key="pandas_io_manager", metadata={"path": "throttled_wo_ff"}))
+def run_throttled_without_fast_finnish_case(dist: np.ndarray, camps: list[Campaign],
+                                            traffic: np.ndarray) -> pd.DataFrame:
+    pacing = ThrottledPacing(dist)
+    process = AdServer(pacing, second_price_auction, camps)
+    sim = Simulation(traffic, process)
+    return aggregate_case_events(sim.run())
+
+
+@op(out=Out(io_manager_key="pandas_io_manager", metadata={"path": "throttled_uniform"}))
+def run_throttled_with_uniform_forecast(camps: list[Campaign], traffic: np.ndarray) -> pd.DataFrame:
+    pacing = ThrottledPacing(uniform_distribution(WINDOWS))
+    process = AdServer(pacing, second_price_auction, camps)
+    sim = Simulation(traffic, process)
+    return aggregate_case_events(sim.run())
+
+
+@job(resource_defs={
+    "pandas_io_manager": pandas_csv_io_manager.configured({"base_dir": "data"})
+})
 def run_all():
-    camps, traffic = prepare_input_data()
+    camps, dist, traffic = prepare_input_data()
     run_asap_case(camps, traffic)
+    run_throttled_case(dist, camps, traffic)
+    run_throttled_without_fast_finnish_case(dist, camps, traffic)
+    run_throttled_with_uniform_forecast(camps, traffic)
 
 
 @repository

@@ -1,5 +1,6 @@
 import os
 from collections import defaultdict
+from typing import Iterable
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -8,7 +9,13 @@ import papermill as pm
 import seaborn as sns
 from nbconvert import HTMLExporter
 
-from src.pacing_simulation.ad_server.ad_server import KIND_WIN
+from pacing_simulation.ad_server.simulation import Event
+from src.pacing_simulation.ad_server.ad_server import KIND_WIN, EVENT_FIELD_NAMES
+
+
+def aggregate_case_events(case_events: Iterable[Event]) -> pd.DataFrame:
+    df = pd.DataFrame.from_records(case_events, columns=EVENT_FIELD_NAMES)
+    return df[df["kind"] == KIND_WIN].groupby(["window", "campaign_id"]).agg(spent=("bid_value", np.sum))
 
 
 def compare_budget_spending(campaigns: pd.DataFrame, base_distribution: pd.DataFrame, events: dict[str, pd.DataFrame]):
@@ -100,11 +107,11 @@ def summary_comparison(events: dict[str, pd.DataFrame], quantile: float = .9, no
     for name, df in events.items():
         win = df[df["kind"] == KIND_WIN]
         res["window_width"][name] = (win.groupby("campaign_id")
-            .aggregate({"window": lambda w: np.max(w) - np.min(w)})
-            .quantile(quantile)[0])
+        .aggregate({"window": lambda w: np.max(w) - np.min(w)})
+        .quantile(quantile)[0])
         res["unique_windows"][name] = (win.groupby("campaign_id")
-            .aggregate({"window": pd.Series.nunique})
-            .quantile(quantile)[0])
+        .aggregate({"window": pd.Series.nunique})
+        .quantile(quantile)[0])
         res["fill_rate"][name] = win.shape[0] / df.shape[0]
         res["revenue"][name] = win["bid_value"].sum()
 
