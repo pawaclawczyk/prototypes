@@ -1,0 +1,20 @@
+## Directories following LFS convention
+var/
+tmp/
+
+## Python build and test artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+*.py[cod]
+__pycache__/
+.coverage
+
+## Common Python virtual environment prefixes
+.env/
+.venv/
+
+## Common convention files excluded from git repositories
+.env
+

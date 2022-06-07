@@ -1,0 +1,14 @@
+dagster-user-deployments:
+  enabled: true
+  enableSubchart: false
+
+dagit:
+  workspace:
+    enabled: true
+    servers:
+      - host: "example-host-1"
+        port: 3030
+        name: "example-name-1"
+      - host: "example-host-2"
+        port: 3030
+        name: "example-name-2"

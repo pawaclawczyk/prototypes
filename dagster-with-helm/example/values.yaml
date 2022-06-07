@@ -1,0 +1,10 @@
+deployments:
+  - name: "dagster-example"
+    image:
+      repository: "docker.io/pawaclawczyk/dagster-example"
+      tag: 0.1.3
+      pullPolicy: Always
+    dagsterApiGrpcArgs:
+      - "-f"
+      - "/dagster-example/repository.py"
+    port: 3030

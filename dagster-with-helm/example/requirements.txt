@@ -1,0 +1,4 @@
+dagster==0.14.16
+# dependecies required for deployment on Kubernetes
+dagster-postgres==0.14.16
+dagster-k8s==0.14.16
