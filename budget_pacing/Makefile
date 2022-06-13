@@ -1,4 +1,4 @@
-.PHONY: clean clean-build clean-pyc develop help
+.PHONY:  help develop dagster/* dagit clean clean/*
 .DEFAULT_GOAL := help
 
 define PRINT_HELP_PYSCRIPT
@@ -48,8 +48,11 @@ help: ## print this help
 
 develop: $(ENVS_DIR)/dev ## set up development environment
 
+dagster/run: $(ENVS_DIR)/$(ENV) $(DAGSTER_HOME) ## run workflow
+	$(__env) $(DAGSTER_ENVS) $(PYTHON) -m dagster job execute -f src/pacing_simulation/workflow/ops.py -c run_config.yaml
+
 dagit: $(ENVS_DIR)/$(ENV) $(DAGSTER_HOME) ## run Dagit
-	$(__env) $(DAGSTER_ENVS) $(PYTHON) -m dagit -f $(DAGSTER_REPOSITORIES)
+	$(__env) $(DAGSTER_ENVS) $(PYTHON) -m dagit -w workspace.yaml
 
 clean: clean/build clean/pyc clean/runtime ## remove all build, test, coverage and Python artifacts
 
