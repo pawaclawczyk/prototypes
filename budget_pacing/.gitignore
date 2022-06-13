@@ -1,4 +1,5 @@
 ## Runtime and temporary data
+data/
 var/
 tmp/
 
